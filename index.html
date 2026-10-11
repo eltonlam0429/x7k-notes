@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-HK"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; form-action 'none'; base-uri 'none'">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="記帳簿"><meta name="theme-color" content="#FFFFFF"><link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAADMUlEQVR4nO3dMW4UVxzA4XXEDVKCaGmgSEXKtLlAesQF0lFGuUCUA0RJnwvQUsZVCtO4RYSShgukmMhaIf82Nob33q6+r9rK8zT++f9mx+P12Yf373Zwna9mL4B1iYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDtK92Qv4z/c//z17CWt5+dM3s5ewO5v+h9SyOGBuIjPjkMUNzUpk2jWHMm5u1rmaE4cybmvKGZsQhzI+zfjz5q0saXQcxsZdDD57JgdpaBzGxt2NPIcmB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB2noxz799vzr7cWjJ09HHvc0XF6cDz6iyUESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQVvkfb4e9+uv17CVc77tvH89ewhe0ehzLZrHZlneqidhWSEvHsfjYuHIs67ytpeNgLnGQlo7jWC70jmWdt7V0HMy1+lvZ7Ydy2Su+U50Zm9Xj2Jz292BZthWSOEjiIImDJA6SOEjiIImDdBw3wQbfIXXPbbN6HFNunJ/28103Z1shLR3H3N+3LfvbvmGWjoO5xEFaOo65l4QuSJeOg7lWfys75UkwM2Ozehwb360pbCskcZCOY1sZ7IdnP85ewv/7/ZcXX/oQJgdJHCTbyiF//vHr3b/I1Sb1eb/aACYHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZA8z3HI53144iiePtxncpDEQbKtHOIxQbieOEjiIImDJA6SOEjiIImDJA6SOEjiIA2N4/6Dh9uLy4vzkcfl05gcpNFxGB5HZObk0Mfizj68fzf+qP+8fXP1+tGTp+MXcNhRPM93sp8meLW57Ha7y4tzI2RN054Eu//g4f780MeC5mwr+/YT4SP7I3a8+XFsJPKRuVlsVomDBbkJRhIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIH6V8cAYcaHfYc/wAAAABJRU5ErkJggg==">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
@@ -230,6 +230,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
+const APP_VERSION='2026.10.11-7';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -535,10 +536,17 @@ const PAY_APP=[[/payme/i,'payme','PayMe'],[/轉數快|\bfps\b/i,'fps','轉數快
 const normNotif=s=>String(s).replace(/\d+\s*(分鐘|小時|秒|mins?|hrs?|h)\s*(前|ago)?|現在|now|剛剛|昨天|\d{1,2}:\d{2}/gi,'').replace(/\s+/g,'');
 function dirOf(s){const i=IN_RE.test(s),o=OUT_RE.test(s);if(i&&!o)return'income';if(o&&!i)return'expense';if(i&&o)return/(你已向|you paid|you sent|轉賬成功|轉帳成功|成功轉賬|成功轉帳|付款成功|成功付款|收款人|payee)/i.test(s)?'expense':'income';return null}
 function parseNotifs(text,useWhole){
-  const lines=String(text).split(/\s*¦\s*/).map(s=>s.trim()).filter(Boolean);const out=[],seen=new Set();
+  const lines=String(text).split(/\s*¦\s*/).map(s=>s.trim()).filter(Boolean);const out=[],seen=new Set();let pend=null;
+  const DISC_RE=/(折扣|優惠券|優惠劵|優惠|coupon|discount|voucher|減免|抵扣)/i;
+  const BRK_RE=/(信用卡|credit card|扣賬卡|debit card|銀行戶口|bank account|付款方式|支付方式|payment method)/i;
   lines.forEach((ln,i)=>{
     const am=ln.match(AMT_RE);if(!am)return;
+    // 優惠券／折扣係細項：喺同一筆交易嘅總數扣返，唔會自己變成一筆
+    if(DISC_RE.test(ln)){const d=num(am[1]||am[2]);if(!(d>0))return;const host=[...out].reverse().find(o=>i-o.idx<=6);
+      if(host&&d<host.amount){host.amount=r2(host.amount-d);host.discount=r2((host.discount||0)+d);host.key+='|d'+d}else pend={d,idx:i};return}
+    // 錢包結餘、信用卡等係付款來源細項，總數已經記咗就唔再記
     if(/(結餘|餘額|balance|可用|額度|limit)/i.test(ln))return;
+    if(BRK_RE.test(ln)&&out.some(o=>i-o.idx<=6))return;
     const win=lines.slice(Math.max(0,i-2),i+2).join(' ');
     if(/(OTP|驗證碼|一次性|密碼)/i.test(win))return;
     const amount=num(am[1]||am[2]);if(!(amount>0))return;
@@ -552,7 +560,9 @@ function parseNotifs(text,useWhole){
     const party=pm?pm[1].replace(/^(你)$/,''):'';
     const key=[type,amount,party,app?app[2]:'',normNotif(ln)].join('|');
     if(seen.has(key))return;seen.add(key);
-    out.push({type,amount,party,app:app?app[1]:'other',appName:app?app[2]:'錢包',text:win,key});
+    const it={type,amount,party,app:app?app[1]:'other',appName:app?app[2]:'錢包',text:win,key,idx:i};
+    if(pend&&i-pend.idx<=3&&pend.d<amount){it.amount=r2(amount-pend.d);it.discount=pend.d;it.key+='|d'+pend.d;pend=null}
+    out.push(it);
   });
   return out;
 }
@@ -577,7 +587,7 @@ function ingest(t,rawLine,res){
     if(c.status!=='confirmed')c.status=c.category==='其他'?'pending':'confirmed';
     res.merged++;
   }else{
-    const nt={id:uid(),...t,category:categorize(t.merchant),status:t.type==='transfer'?'confirmed':(both&&(Date.now()-toDate(t.ts))/36e5<S.settings.mergeHours?'processing':'pending'),sources:[t.source],note:''};
+    const nt={id:uid(),note:'',...t,category:categorize(t.merchant),status:t.type==='transfer'?'confirmed':(both&&(Date.now()-toDate(t.ts))/36e5<S.settings.mergeHours?'processing':'pending'),sources:[t.source]};
     S.txns.push(nt);res.added++;
     if(fm.review){nt.status='pending';fm.review.status='pending';S.reviews.push({id:uid(),a:fm.review.id,b:nt.id,kind:fm.kind,resolved:false});res.review++}
   }
@@ -595,7 +605,7 @@ function importText(text){
       for(const it of items){
         const k='n'+hash(it.key);if(S.imported[k]){res.dupe++;continue}S.imported[k]=1;
         if(it.type==='income')addIncomeAuto({ts,amount:it.amount,name:`${it.appName}${it.party?' · 由 '+it.party:' 收款'}`,src,raw:it.text},res);
-        else ingest({ts,amount:it.amount,merchant:it.party?`${it.appName} · ${it.party}`:it.appName,channel:notifChannel(it.app),type:it.type,source:src},it.text,res);
+        else ingest({ts,amount:it.amount,merchant:it.party?`${it.appName} · ${it.party}`:it.appName,channel:notifChannel(it.app),type:it.type,source:src,note:it.discount?`已扣除優惠券／折扣 $${it.discount}`:''},it.text,res);
       }
       continue;
     }
@@ -1032,6 +1042,7 @@ function renderCards(){
     <div class="actions"><button class="btn line" type="button" data-act="open-import">從檔案／貼上匯入</button></div>
     <div class="actions"><button class="btn" type="button" data-act="export-xlsx">匯出 Excel</button><button class="btn ghost" type="button" data-act="export-json">備份</button><button class="btn line" type="button" data-act="restore">還原備份</button></div>
     <div class="actions"><button class="btn danger" type="button" id="wipe">清除所有資料</button></div>
+    <div class="sum-line small"><span class="faint">App 版本 ${APP_VERSION}</span><button class="btn sm line" type="button" data-act="check-update">檢查更新</button></div>
   </div>`;
   document.querySelectorAll('[data-ch]').forEach(i=>i.onchange=()=>{S.channels[i.dataset.ch]=i.checked;save();toast(i.checked?'已開啟收集':'已停止收集')});
   $('#merge-h').onchange=e=>{S.settings.mergeHours=+e.target.value;save();toast('已更新合併範圍')};
@@ -1397,6 +1408,7 @@ document.addEventListener('click',e=>{
   else if(a==='restore')$('#file-backup').click();
   else if(a==='open-import')openImport();
   else if(a==='sync-now')syncPull(true);
+  else if(a==='check-update')checkUpdate(true);
 });
 function selectText(id){const r=document.createRange();r.selectNodeContents($('#'+id));const s=getSelection();s.removeAllRanges();s.addRange(r);toast('已選取，撳「拷貝」')}
 $('#file-inbox').onchange=async e=>{const f=e.target.files[0];if(!f)return;const t=await f.text();e.target.value='';showImportResult(importText(t))};
@@ -1419,6 +1431,15 @@ try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}ca
 setInterval(()=>{if(document.hidden)return;refreshStatuses();if(CONN)syncPull(false);else softRender()},60000);
 document.addEventListener('visibilitychange',()=>{if(!CONN)return;if(document.hidden){if(SYNC.dirty)syncPush()}else syncPull(false)});
 if(CONN)syncPull(false);
+// 主畫面 app 有時會用舊嘅暫存版本：開 app 時向網站攞最新版本比較，有新版就提你重新載入
+async function checkUpdate(manual){
+  if(IN_PREVIEW||!/^https?:/.test(location.protocol)){if(manual)toast('呢個版本唔支援檢查更新');return}
+  try{const r=await fetch(location.href.split('#')[0],{cache:'reload'});const t=await r.text();const m=t.match(/APP_VERSION='([^']+)'/);
+    if(m&&m[1]!==APP_VERSION)toast(`有新版本 ${m[1]}`,'重新載入',()=>location.reload());
+    else if(manual)toast('已經係最新版本 '+APP_VERSION);}
+  catch(e){if(manual)toast('檢查唔到更新：'+e.message)}
+}
+checkUpdate(false);
 </script>
 
 </body></html>
