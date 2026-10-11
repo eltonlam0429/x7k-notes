@@ -595,8 +595,10 @@ const fmtSec=d=>`${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.g
 async function api(body,params){
   if(!CONN)throw new Error('未連接');
   let r;
+  try{
   if(body)r=await fetch(CONN.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...body,token:CONN.token})});
   else{const u=new URL(CONN.url);u.searchParams.set('token',CONN.token);Object.entries(params||{}).forEach(([k,v])=>u.searchParams.set(k,v));r=await fetch(u.toString())}
+  }catch(e){throw new Error(navigator.onLine===false?'冇網絡':'連唔到試算表。請確認部署嘅「存取權」係「所有人」，同埋網址係 /exec 結尾（唔係 /dev）')}
   let j;try{j=await r.json()}catch(e){throw new Error('試算表回覆唔係預期格式，請檢查網址係咪「/exec」結尾')}
   if(!j.ok)throw new Error(j.error==='token'?'密碼（token）唔啱':'試算表回覆錯誤：'+(j.error||'未知'));
   return j;
