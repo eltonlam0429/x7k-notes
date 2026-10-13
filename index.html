@@ -100,6 +100,11 @@ h3{font-size:17px;margin:0;font-weight:700}
 .bars button{flex:1;min-width:0;height:100%;display:flex;align-items:flex-end;background:none;border:0;padding:0}
 .bars i{display:block;width:100%;border-radius:3px 3px 1px 1px;background:var(--bar);min-height:5px;transition:background .15s}
 .bars button[aria-pressed="true"] i{background:var(--bar-sel)}
+.bars i.clip{position:relative}
+.brk{position:absolute;left:-2px;right:-2px;top:38%;height:7px;background:var(--surface);transform:skewY(-28deg);border-top:1.5px solid currentColor;border-bottom:1.5px solid currentColor;color:var(--bar)}
+.bars button[aria-pressed="true"] .brk{color:var(--bar-sel)}
+.clip-note{display:flex;gap:8px;align-items:center}
+.clip-key{position:relative;display:inline-block;width:10px;height:20px;background:var(--bar);border-radius:2px;flex:none}
 .bars button:disabled{cursor:default}
 .bar-axis{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-3);margin-top:-4px}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
@@ -143,6 +148,11 @@ h3{font-size:17px;margin:0;font-weight:700}
 .group-h:first-child{border-top:0;margin-top:0}
 .review{border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .review .q{font-weight:600}
+.pending-zone{border:1.5px dashed var(--amber)}
+.rv-tag{font-size:12px;font-weight:700;letter-spacing:.04em;padding-top:8px}
+.rv-tag.ok{color:var(--green)}.rv-tag.new{color:var(--amber)}
+.rv-tag+.li{border-top:0;padding-top:4px}
+.li.ref{opacity:.75}
 .review .acts{display:flex;gap:8px;flex-wrap:wrap}
 
 .cat-row{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 0;border-top:1px solid var(--line);background:none;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left}
@@ -235,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.11-8';
+const APP_VERSION='2026.10.13-9';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -294,7 +304,7 @@ function merchantSim(a,b){
 
 /* ===================== 儲存 ===================== */
 const LS_KEY='ledger.v1';
-function blankState(){return{v:1,demo:false,inboxSince:0,txns:[],imported:{},lastImport:null,reviews:[],incomeTemplates:[],incomeEntries:[],incomeOverrides:{},bills:[],billOverrides:{},cards:[],channels:{applepay:true,sms:true,octopus:true,notif:true,mail:true,cash:true},rules:{},settings:{mergeHours:12,hideIncome:false}}}
+function blankState(){return{v:1,demo:false,inboxSince:0,txns:[],imported:{},lastImport:null,reviews:[],trash:[],incomeTemplates:[],incomeEntries:[],incomeOverrides:{},bills:[],billOverrides:{},cards:[],channels:{applepay:true,sms:true,octopus:true,notif:true,mail:true,cash:true},rules:{},settings:{mergeHours:12,hideIncome:false}}}
 function load(){try{const s=localStorage.getItem(LS_KEY);if(!s)return null;const o=JSON.parse(s);return hydrate(o)}catch(e){return null}}
 let saveWarned=false;
 function localSave(){try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){if(!saveWarned){saveWarned=true;toast('未能儲存：瀏覽器唔俾用本機儲存空間')}}}
@@ -353,6 +363,8 @@ function migrateSched(x,isBill){
   else if(!x.startDate)x.startDate=(x.startMonth||curMonth())+'-01';
 }
 function migrate(s){
+  if(!Array.isArray(s.trash))s.trash=[];
+  {const lim=fmtLocal(new Date(Date.now()-60*864e5));s.trash=s.trash.filter(x=>x.at>=lim)}
   if(s.channels&&s.channels.notif===undefined)s.channels.notif=true;
   if(s.channels&&s.channels.mail===undefined)s.channels.mail=true;
   (s.bills||[]).forEach(b=>migrateSched(b,true));
@@ -602,7 +614,7 @@ function ingest(t,rawLine,res){
   }else{
     const nt={id:uid(),note:'',...t,category:categorize(t.merchant),status:t.type==='transfer'?'confirmed':(both&&(Date.now()-toDate(t.ts))/36e5<S.settings.mergeHours?'processing':'pending'),sources:[t.source]};
     S.txns.push(nt);res.added++;
-    if(fm.review){nt.status='pending';fm.review.status='pending';S.reviews.push({id:uid(),a:fm.review.id,b:nt.id,kind:fm.kind,resolved:false});res.review++}
+    if(fm.review){nt.status='pending';if(fm.review.status!=='confirmed')fm.review.status='pending';S.reviews.push({id:uid(),a:fm.review.id,b:nt.id,kind:fm.kind,resolved:false});res.review++}
   }
 }
 function importText(text){
@@ -875,7 +887,11 @@ function renderOverview(){
   const m=ui.month,tx=ALL.filter(t=>t.ts.startsWith(m));
   const exp=sum(tx.filter(isExp)),ref=sum(tx.filter(isRef)),incItems=incomeItems(m),inc=sum(incItems),bal=r2(inc-exp+ref);
   const nd=daysIn(m),daily=Array(nd).fill(0);tx.filter(t=>isExp(t)&&!t.noDay).forEach(t=>daily[+t.ts.slice(8,10)-1]+=t.amount);const noDayAmt=sum(tx.filter(t=>isExp(t)&&t.noDay));
-  const maxV=Math.max(...daily,0);const ranked=daily.map((v,i)=>({d:i+1,v:r2(v)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+  // 極大值壓縮：如果最大嗰一兩日遠超其他日子（相差 2.5 倍以上），就縮短佢哋，並用斷開符號標示
+  const sortedV=daily.filter(v=>v>0).sort((a,b)=>b-a);let cutN=0;
+  for(let i=0;i<Math.min(3,sortedV.length-3);i++)if(sortedV[i]>=2.5*sortedV[i+1]){cutN=i+1}
+  const scaleTop=cutN?sortedV[cutN]*1.35:Math.max(...daily,0);const clippedVals=new Set(sortedV.slice(0,cutN));
+  const maxV=scaleTop;const ranked=daily.map((v,i)=>({d:i+1,v:r2(v)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
   if(ui.selDay==null||ui.selDay>nd||!daily[ui.selDay-1])ui.selDay=ranked[0]?ranked[0].d:null;
   const sel=ui.selDay;const selTx=sel?tx.filter(t=>isExp(t)&&!t.noDay&&+t.ts.slice(8,10)===sel):[];
   const pend=S.txns.filter(t=>t.status==='pending').length;
@@ -914,8 +930,9 @@ function renderOverview(){
   <div class="card">
     <div class="card-head"><div><div class="label-caps">Daily spending</div><h3 style="margin-top:4px">邊日用錢最多？</h3></div><span class="small muted">HKD · 按柱查看</span></div>
     <div class="kpis"><div><div class="k">最高消費日</div><div class="kv num">${ranked[0]?`${ranked[0].d} 日 · ${money(ranked[0].v)}`:'—'}</div></div><div><div class="k">有消費日數</div><div class="kv num">${ranked.length} 日</div></div></div>
-    <div class="bars" role="group" aria-label="每日支出">${daily.map((v,i)=>`<button type="button" data-act="day" data-d="${i+1}" aria-pressed="${sel===i+1}" aria-label="${i+1}日 ${money(v)}" ${v?'':'disabled'}><i style="height:${maxV?Math.max(2.5,v/maxV*100):2.5}%"></i></button>`).join('')}</div>
+    <div class="bars" role="group" aria-label="每日支出">${daily.map((v,i)=>`<button type="button" data-act="day" data-d="${i+1}" aria-pressed="${sel===i+1}" aria-label="${i+1}日 ${money(v)}${clippedVals.has(v)?'（已縮短顯示）':''}" ${v?'':'disabled'}>${clippedVals.has(v)&&v>scaleTop?`<i class="clip" style="height:100%"><b class="brk"></b></i>`:`<i style="height:${maxV?Math.max(2.5,Math.min(100,v/maxV*100)):2.5}%"></i>`}</button>`).join('')}</div>
     <div class="bar-axis"><span>1 日</span><span>8 日</span><span>15 日</span><span>22 日</span><span>${nd} 日</span></div>
+    ${cutN?`<div class="small muted clip-note"><span class="clip-key" aria-hidden="true"><b class="brk"></b></span>有斷開符號嘅柱金額太大，已縮短顯示：${daily.map((v,i)=>({v,d:i+1})).filter(x=>clippedVals.has(x.v)&&x.v>scaleTop).map(x=>`${x.d} 日 ${money(x.v)}`).join('、')}</div>`:''}
     ${noDayAmt?`<div class="small muted">另有 ${money(noDayAmt)} 未指定日子嘅支出（已計入本月支出）</div>`:''}
     ${ranked.length?`<div class="chips">${ranked.slice(0,3).map((r,i)=>`<button class="chip num" type="button" data-act="day" data-d="${r.d}" aria-pressed="${sel===r.d}">#${i+1} · ${r.d} 日 ${money(r.v)}</button>`).join('')}</div>`:''}
     ${sel?`<div class="day-detail"><b style="font-size:17px">${mm} 月 ${sel} 日 · HK${money(sum(selTx))}</b>${selTx.map(t=>{const h=+t.ts.slice(11,13);return`<button class="row" type="button" data-act="edit" data-id="${esc(t.id)}" style="background:none;border:0;padding:0;text-align:left;width:100%"><span>${t.ts.slice(11,16)} ${partOfDay(h)} · ${esc(t.merchant)}</span><b class="num">${money(t.amount)}</b></button>`}).join('')}</div>`:`<div class="empty">呢個月未有消費記錄</div>`}
@@ -963,14 +980,18 @@ function quickAdd(text){
 /* ===================== 記錄與核實 ===================== */
 function renderRecords(){
   const{mode,anchor}=ui.rec;const{s,e,label}=range(mode,anchor);
-  let tx=inRange(s,e);if(ui.onlyPending)tx=tx.filter(t=>t.status!=='confirmed');
+  // 下面只列已核實記錄；未核實嘅只喺「待核實」出現，核實後先會移落嚟
+  const all=inRange(s,e);const tx=all.filter(t=>t.status==='confirmed');const unv=all.filter(t=>t.status!=='confirmed');
   const exp=sum(tx.filter(isExp)),ref=sum(tx.filter(isRef));
   const open=S.reviews.filter(r=>!r.resolved&&S.txns.find(t=>t.id===r.a)&&S.txns.find(t=>t.id===r.b));
   const inRev=new Set(open.flatMap(r=>[r.a,r.b]));
-  const pend=S.txns.filter(t=>t.status==='pending'&&!inRev.has(t.id));
+  const pend=S.txns.filter(t=>t.status!=='confirmed'&&!inRev.has(t.id)).sort((a,b)=>a.ts<b.ts?1:-1);
+  // 已核實嗰筆喺度只作參考，唔可以喺待核實區改或刪，避免誤刪真正記錄
+  const rvRow=t=>t.status==='confirmed'?txRow(t).replace(/^<button class="li" type="button" data-act="edit" data-id="[^"]*"/,'<div class="li ref"').replace(/<\/button>$/,'</div>'):txRow(t);
+  const tag=t=>t.status==='confirmed'?'<div class="rv-tag ok">現有記錄 · 已核實</div>':'<div class="rv-tag new">新收到 · 待核實</div>';
   let body='';
   const desc=[...tx].reverse();
-  if(!desc.length)body='<div class="empty">呢段時間冇記錄</div>';
+  if(!desc.length)body=`<div class="empty">呢段時間冇已核實記錄${unv.length?'，請先喺上面核實':''}</div>`;
   else if(mode==='year'){
     const byM={};desc.forEach(t=>(byM[t.ts.slice(0,7)]=byM[t.ts.slice(0,7)]||[]).push(t));
     body=Object.keys(byM).map(k=>{const x=byM[k];return`<button class="li" type="button" data-act="drill" data-anchor="${k}-01"><span class="grow"><span class="t" style="display:block">${+k.slice(5)}月</span><span class="m">${x.filter(isExp).length} 筆支出 · 撳入去睇細項</span></span><span class="amt num">${money(sum(x.filter(isExp)))}</span></button>`}).join('');
@@ -980,23 +1001,24 @@ function renderRecords(){
     body=Object.keys(byD).map(k=>{if(k.endsWith('-00'))return`<div class="group-h"><span>${+k.slice(5,7)}月（未指定日子）</span><span class="num">${money(sum(byD[k].filter(isExp)))}</span></div>`+byD[k].map(txRow).join('');const d=toDate(k+'T00:00');return`<button class="group-h" type="button" data-act="drill-day" data-anchor="${k}"><span>${d.getMonth()+1}月${d.getDate()}日（${WK[d.getDay()]}）</span><span class="num">${money(sum(byD[k].filter(isExp)))}</span></button>`+byD[k].map(txRow).join('')}).join('');
   }
   $('#tab-records').innerHTML=`
-  <div class="page-head"><div><div class="eyebrow">逐筆睇清楚，錯咗即刻改。</div><h1>記錄與核實</h1></div><button class="btn sm" type="button" data-act="new-tx">＋ 新增支出</button></div>
-  ${open.length||pend.length?`<div class="card"><div class="card-head"><h3>待核實</h3><span class="small muted">${open.length} 組可能重複 · ${pend.length} 筆待確認</span></div>
-    ${open.map(r=>{const a=S.txns.find(t=>t.id===r.a),b=S.txns.find(t=>t.id===r.b);const mins=Math.round(Math.abs(toDate(a.ts)-toDate(b.ts))/6e4);return`<div class="review"><div class="q">${r.kind==='repeat'?`同一商戶、同一金額，相隔 ${mins} 分鐘。係一筆定兩筆？`:`${SRC_L[a.source]||'通知'} 同 ${SRC_L[b.source]||'通知'} 金額一樣（相隔 ${mins>=60?Math.round(mins/6)/10+' 小時':mins+' 分鐘'}），可能係同一筆。`}</div><div class="list">${txRow(a)}${txRow(b)}</div><label class="field"><span>分類（自動判斷，可以改）</span><select data-act="rev-cat" data-id="${r.id}">${catOptions(a.category)}</select></label><div class="acts"><button class="btn sm" type="button" data-act="rev-same" data-id="${r.id}">同一筆，合併</button><button class="btn sm ghost" type="button" data-act="rev-diff" data-id="${r.id}">${r.kind==='repeat'?'真係兩筆（多次）':'唔同交易，保留兩筆'}</button></div></div>`}).join('')}
-    ${pend.length?`<div class="list">${pend.slice(0,30).map(txRow).join('')}</div><div class="actions"><button class="btn ghost" type="button" data-act="confirm-all">全部 ${pend.length} 筆標為已確認</button></div>`:''}
+  <div class="page-head"><div><div class="eyebrow">逐筆睇清楚，錯咗即刻改。</div><h1>記錄與核實</h1></div><div class="actions" style="flex:none"><button class="btn sm line" type="button" data-act="trash">垃圾筒${S.trash.length?`（${S.trash.length}）`:''}</button><button class="btn sm" type="button" data-act="new-tx">＋ 新增支出</button></div></div>
+  ${open.length||pend.length?`<div class="card pending-zone"><div class="card-head"><h3>待核實</h3><span class="small muted">${open.length} 組可能重複 · ${pend.length} 筆待確認</span></div>
+    <div class="small muted">呢度嘅記錄未計入下面嘅已核實記錄。撳入去可以改或刪除，確認之後就會移落去。</div>
+    ${open.map(r=>{const a=S.txns.find(t=>t.id===r.a),b=S.txns.find(t=>t.id===r.b);const mins=Math.round(Math.abs(toDate(a.ts)-toDate(b.ts))/6e4);return`<div class="review"><div class="q">${r.kind==='repeat'?`同一商戶、同一金額，相隔 ${mins} 分鐘。係一筆定兩筆？`:`${SRC_L[a.source]||'通知'} 同 ${SRC_L[b.source]||'通知'} 金額一樣（相隔 ${mins>=60?Math.round(mins/6)/10+' 小時':mins+' 分鐘'}），可能係同一筆。`}</div><div class="list">${tag(a)}${rvRow(a)}${tag(b)}${rvRow(b)}</div><label class="field"><span>分類（自動判斷，可以改）</span><select data-act="rev-cat" data-id="${r.id}">${catOptions(a.category)}</select></label><div class="acts"><button class="btn sm" type="button" data-act="rev-same" data-id="${r.id}">同一筆，合併</button><button class="btn sm ghost" type="button" data-act="rev-diff" data-id="${r.id}">${r.kind==='repeat'?'真係兩筆（多次）':'唔同交易，保留兩筆'}</button></div><div class="small faint">「合併」會保留上面嗰筆，下面嗰筆會移去垃圾筒。</div></div>`}).join('')}
+    ${pend.length?`<div class="list">${pend.slice(0,30).map(txRow).join('')}</div><div class="actions"><button class="btn ghost" type="button" data-act="confirm-all">全部 ${pend.length} 筆確認，移去已核實記錄</button></div>`:''}
   </div>`:''}
   <div class="seg" role="group" aria-label="周期">${['day','week','month','year'].map(k=>`<button type="button" data-act="rec-mode" data-mode="${k}" aria-pressed="${mode===k}">${MODE_L[k]}</button>`).join('')}</div>
   <div class="period"><button class="icon-btn" type="button" data-act="rec-prev" aria-label="上一段">‹</button><div class="lbl">${label}</div><button class="icon-btn" type="button" data-act="rec-next" aria-label="下一段">›</button></div>
   <div class="card">
-    <div class="sum-line"><div><div class="small muted">${label}支出</div><div class="v num">${money(exp)}</div></div><div class="small muted" style="text-align:right">${tx.filter(isExp).length} 筆${ref?` · 退款 ${money(ref)}`:''}<br><label class="check" style="justify-content:flex-end;font-size:13px"><input type="checkbox" id="only-pending" ${ui.onlyPending?'checked':''}>只睇未確認</label></div></div>
+    <div class="card-head"><h3>已核實記錄</h3></div>
+    <div class="sum-line"><div><div class="small muted">${label}支出</div><div class="v num">${money(exp)}</div></div><div class="small muted" style="text-align:right">${tx.filter(isExp).length} 筆${ref?` · 退款 ${money(ref)}`:''}${unv.length?`<br>另有 ${unv.length} 筆待核實 ${money(sum(unv.filter(isExp)))}（未計入）`:''}</div></div>
     <div class="list">${body}</div>
   </div>`;
-  $('#only-pending').onchange=e=>{ui.onlyPending=e.target.checked;render()};
   document.querySelectorAll('[data-act="rev-cat"]').forEach(s=>s.onchange=()=>{const r=S.reviews.find(x=>x.id===s.dataset.id);[r.a,r.b].forEach(id=>{const t=S.txns.find(x=>x.id===id);if(t){t.category=s.value;t.catChecked=true}});save();toast('已改分類')});
 }
 function resolveReview(id,same){
   const r=S.reviews.find(x=>x.id===id);if(!r)return;const a=S.txns.find(t=>t.id===r.a),b=S.txns.find(t=>t.id===r.b);
-  if(same&&a&&b){a.sources=[...new Set([...(a.sources||[a.source]),...(b.sources||[b.source])])];a.raw=[...(a.raw||[]),...(b.raw||[])];if(b.source==='applepay'){a.merchant=b.merchant;a.ts=b.ts}S.txns=S.txns.filter(t=>t.id!==b.id)}
+  if(same&&a&&b){a.sources=[...new Set([...(a.sources||[a.source]),...(b.sources||[b.source])])];a.raw=[...(a.raw||[]),...(b.raw||[])];if(b.source==='applepay'){a.merchant=b.merchant;a.ts=b.ts}S.txns=S.txns.filter(t=>t.id!==b.id);trashPut('txn',b,{reason:'合併時移除'})}
   [a,same?null:b].forEach(t=>{if(t)t.status='confirmed'});
   r.resolved=true;save();render();toast(same?'已合併為一筆':'已保留兩筆');
 }
@@ -1138,6 +1160,32 @@ function cycleChangeFields(id,x){
   return`<details id="${id}"><summary>改周期（由某日起生效，之前記錄保留）</summary><div class="stack" style="margin-top:12px"><div class="field"><span>新周期由幾時開始（日子可以唔揀）</span>${dateFields(id+'-s',nx?(nx.noDay?nx.key:nx.date):todayKey())}</div>${cycleFields(id+'-c',x.freq,x.every)}</div></details>`;
 }
 
+/* ===================== 垃圾筒 ===================== */
+// 手動刪除嘅記錄會擺入垃圾筒 60 日，可以逐筆或者全部還原
+function trashPut(kind,item,extra={}){S.trash.unshift({id:uid(),kind,at:fmtLocal(new Date()),item:JSON.parse(JSON.stringify(item)),...extra})}
+function trashRestore(e){
+  if(e.kind==='txn'){if(!S.txns.some(t=>t.id===e.item.id))S.txns.push(e.item)}
+  else if(e.kind==='income'){if(!S.incomeEntries.some(x=>x.id===e.item.id))S.incomeEntries.push(e.item)}
+  else if(e.kind==='fx'){const o=(S.billOverrides[e.bid]||{});if(o[e.key]&&o[e.key].skip)delete o[e.key]}
+  S.trash=S.trash.filter(x=>x!==e);
+}
+function trashLabel(e){
+  const it=e.item;const k={txn:'支出',income:'收入',fx:'定期繳費一期'}[e.kind]||'';
+  const when=e.kind==='income'?`${it.month}${it.day?'-'+pad(it.day):''}`:e.kind==='fx'?e.key:(it.noDay?it.ts.slice(0,7):it.ts.slice(0,16).replace('T',' '));
+  return{name:(e.kind==='income'?it.name:it.merchant)||'（冇描述）',k,when,amount:it.amount};
+}
+function openTrash(){
+  const draw=()=>{const list=S.trash;
+    openSheet(`垃圾筒（${list.length}）`,`<div class="small muted">手動刪除嘅記錄會留喺度 60 日，之後自動清走。</div>
+      ${list.length?`<div class="list">${list.map(e=>{const l=trashLabel(e);return`<div class="li"><span class="grow"><span class="t" style="display:block">${esc(l.name)}</span><span class="m">${l.k} · ${esc(l.when)} · 刪除於 ${+e.at.slice(5,7)}/${+e.at.slice(8,10)} ${e.at.slice(11,16)}${e.reason?' · '+esc(e.reason):''}</span></span><span class="amt num">${money(l.amount)}</span><button class="btn sm ghost" type="button" data-rs="${e.id}">還原</button></div>`}).join('')}</div>
+      <div class="actions"><button class="btn" type="button" id="tr-all">全部還原（${list.length}）</button><button class="btn danger" type="button" id="tr-empty">清空垃圾筒</button></div>`:'<div class="empty">垃圾筒係空嘅</div>'}`,()=>{
+        document.querySelectorAll('[data-rs]').forEach(b=>b.onclick=()=>{const e=S.trash.find(x=>x.id===b.dataset.rs);if(e){trashRestore(e);save();draw();toast('已還原')}});
+        const all=$('#tr-all');if(all)all.onclick=()=>{const n=S.trash.length;[...S.trash].forEach(trashRestore);save();closeSheet();render();toast(`已還原 ${n} 筆`)};
+        const em=$('#tr-empty');if(em)arm(em,()=>{S.trash=[];save();closeSheet();render();toast('已清空垃圾筒')},'再按一次：永久刪除');
+      });};
+  draw();
+}
+
 /* ===================== Sheets ===================== */
 function openEditTx(id){
   if(id.startsWith('fx|'))return openFixedInstance(id);
@@ -1162,7 +1210,7 @@ function openEditTx(id){
         let n=0;if($('#f-rule').checked&&t.merchant){const k=normMerchant(t.merchant);S.rules[k]=t.category;S.txns.forEach(x=>{if(x!==t&&normMerchant(x.merchant)===k&&x.category!==t.category){x.category=t.category;x.catChecked=true;n++}})}
         save();closeSheet();render();toast(n?`已儲存，另外 ${n} 筆同商戶記錄都改咗分類`:'已儲存');
       };
-      arm($('#f-del'),()=>{S.txns=S.txns.filter(x=>x.id!==t.id);save();closeSheet();render();toast('已刪除','復原',()=>{S.txns.push(t);save();render()})});
+      arm($('#f-del'),()=>{S.txns=S.txns.filter(x=>x.id!==t.id);trashPut('txn',t);const e=S.trash[0];save();closeSheet();render();toast('已移去垃圾筒','復原',()=>{trashRestore(e);save();render()})});
     });
 }
 function openFixedInstance(id){
@@ -1174,7 +1222,7 @@ function openFixedInstance(id){
     <label class="check"><input type="checkbox" id="fi-skip" ${ov.skip?'checked':''}><span>呢期冇扣數（唔計入）</span></label>
     <div class="actions"><button class="btn" type="button" id="fi-save">只修改呢一期</button><button class="btn line" type="button" id="fi-bill">編輯定期繳費設定</button></div>
     <div class="actions"><button class="btn danger" type="button" id="fi-del">刪除呢一期</button></div>`,()=>{
-      arm($('#fi-del'),()=>{(S.billOverrides[bid]=S.billOverrides[bid]||{})[key]={skip:true};save();closeSheet();render();toast('已刪除呢一期，其他期數唔受影響')});
+      arm($('#fi-del'),()=>{(S.billOverrides[bid]=S.billOverrides[bid]||{})[key]={skip:true};trashPut('fx',{merchant:b.name,amount:ov.amount!=null?ov.amount:b.amount},{bid,key});save();closeSheet();render();toast('已將呢一期移去垃圾筒')});
       $('#fi-save').onclick=()=>{const a=num($('#fi-amt').value);const o=(S.billOverrides[bid]=S.billOverrides[bid]||{});o[key]={};if($('#fi-skip').checked)o[key].skip=true;if(a>=0&&r2(a)!==b.amount)o[key].amount=r2(a);if(!o[key].skip&&o[key].amount==null)delete o[key];save();closeSheet();render();toast('已修改呢一期')};
       $('#fi-bill').onclick=()=>openBill(bid);
     });
@@ -1289,7 +1337,7 @@ function openIncome(id,src){
       <div class="err" id="i-err" hidden></div>
       <div class="actions"><button class="btn" type="button" id="i-save">儲存</button><button class="btn danger" type="button" id="i-del">刪除</button></div>`,()=>{
         $('#i-save').onclick=()=>{const amt=num($('#i-amt').value);if(isNaN(amt)||amt<0)return errIn('i-err')('請輸入金額');const d=readDate('i-date');Object.assign(e,{name:$('#i-name').value.trim()||KIND[$('#i-kind').value],kind:$('#i-kind').value,amount:r2(amt),month:d.slice(0,7),day:d.length>7?+d.slice(8,10):null});ui.incMonth=e.month;save();closeSheet();render();toast('已儲存收入')};
-        arm($('#i-del'),()=>{S.incomeEntries=S.incomeEntries.filter(x=>x!==e);save();closeSheet();render();toast('已刪除')});
+        arm($('#i-del'),()=>{S.incomeEntries=S.incomeEntries.filter(x=>x!==e);trashPut('income',e);const te=S.trash[0];save();closeSheet();render();toast('已移去垃圾筒','復原',()=>{trashRestore(te);save();render()})});
       });
     return;
   }
@@ -1409,13 +1457,14 @@ document.addEventListener('click',e=>{
   else if(a==='add-bill')openExpense('rec');
   else if(a==='edit-bill')openBill(b.dataset.id);
   else if(a==='new-tx')openExpense('single');
+  else if(a==='trash')openTrash();
   else if(a==='cat-check')openCatCheck(b.dataset.id);
   else if(a==='rec-mode'){ui.rec.mode=b.dataset.mode;render()}
   else if(a==='rec-prev'||a==='rec-next'){ui.rec.anchor=shift(ui.rec.mode,ui.rec.anchor,a==='rec-prev'?-1:1);render()}
   else if(a==='drill'){ui.rec.mode='month';ui.rec.anchor=b.dataset.anchor;render()}
   else if(a==='drill-day'){ui.rec.mode='day';ui.rec.anchor=b.dataset.anchor;render()}
   else if(a==='rev-same'||a==='rev-diff')resolveReview(b.dataset.id,a==='rev-same');
-  else if(a==='confirm-all'){const open=new Set(S.reviews.filter(r=>!r.resolved).flatMap(r=>[r.a,r.b]));let n=0;S.txns.forEach(t=>{if(t.status==='pending'&&!open.has(t.id)){t.status='confirmed';n++}});save();render();toast(`已確認 ${n} 筆`)}
+  else if(a==='confirm-all'){const open=new Set(S.reviews.filter(r=>!r.resolved).flatMap(r=>[r.a,r.b]));let n=0;S.txns.forEach(t=>{if(t.status!=='confirmed'&&!open.has(t.id)){t.status='confirmed';n++}});save();render();toast(`已確認 ${n} 筆`)}
   else if(a==='ana-mode'){ui.ana.mode=b.dataset.mode;render()}
   else if(a==='ana-prev'||a==='ana-next'){ui.ana.anchor=shift(ui.ana.mode,ui.ana.anchor,a==='ana-prev'?-1:1);render()}
   else if(a==='ana-cat'){ui.ana.cat=b.dataset.cat||null;render();if(ui.ana.cat)setTimeout(()=>{const c=document.querySelectorAll('#tab-analysis .card');c[c.length-1].scrollIntoView({behavior:'smooth',block:'start'})},30)}
