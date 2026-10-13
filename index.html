@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.13-9';
+const APP_VERSION='2026.10.13-10';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -887,11 +887,14 @@ function renderOverview(){
   const m=ui.month,tx=ALL.filter(t=>t.ts.startsWith(m));
   const exp=sum(tx.filter(isExp)),ref=sum(tx.filter(isRef)),incItems=incomeItems(m),inc=sum(incItems),bal=r2(inc-exp+ref);
   const nd=daysIn(m),daily=Array(nd).fill(0);tx.filter(t=>isExp(t)&&!t.noDay).forEach(t=>daily[+t.ts.slice(8,10)-1]+=t.amount);const noDayAmt=sum(tx.filter(t=>isExp(t)&&t.noDay));
-  // 極大值壓縮：如果最大嗰一兩日遠超其他日子（相差 2.5 倍以上），就縮短佢哋，並用斷開符號標示
-  const sortedV=daily.filter(v=>v>0).sort((a,b)=>b-a);let cutN=0;
-  for(let i=0;i<Math.min(3,sortedV.length-3);i++)if(sortedV[i]>=2.5*sortedV[i+1]){cutN=i+1}
-  const scaleTop=cutN?sortedV[cutN]*1.35:Math.max(...daily,0);const clippedVals=new Set(sortedV.slice(0,cutN));
-  const maxV=scaleTop;const ranked=daily.map((v,i)=>({d:i+1,v:r2(v)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+  // 柱高：金額相差唔大就照比例；相差太大（最大 ÷ 最小 > 15 倍）就壓縮比例，令細額都睇得到，特別大嘅日子加斷開符號
+  const nz=daily.filter(v=>v>0).sort((a,b)=>a-b);const minNZ=nz[0]||0,maxNZ=nz[nz.length-1]||0;
+  const median=nz.length?nz[Math.floor((nz.length-1)/2)]:0;
+  const compressed=nz.length>=2&&maxNZ/minNZ>15;
+  const isBig=v=>compressed&&v>0&&v>=Math.max(5*median,maxNZ*0.5)&&v>=8*minNZ;
+  const barH=v=>{if(!v)return 2.5;if(!compressed)return Math.max(6,v/maxNZ*100);return 10+90*Math.log1p(v/minNZ-1+1e-9)/Math.log1p(maxNZ/minNZ-1+1e-9)};
+  const bigDays=daily.map((v,i)=>({v,d:i+1})).filter(x=>isBig(x.v));
+  const maxV=maxNZ;const ranked=daily.map((v,i)=>({d:i+1,v:r2(v)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
   if(ui.selDay==null||ui.selDay>nd||!daily[ui.selDay-1])ui.selDay=ranked[0]?ranked[0].d:null;
   const sel=ui.selDay;const selTx=sel?tx.filter(t=>isExp(t)&&!t.noDay&&+t.ts.slice(8,10)===sel):[];
   const pend=S.txns.filter(t=>t.status==='pending').length;
@@ -930,9 +933,9 @@ function renderOverview(){
   <div class="card">
     <div class="card-head"><div><div class="label-caps">Daily spending</div><h3 style="margin-top:4px">邊日用錢最多？</h3></div><span class="small muted">HKD · 按柱查看</span></div>
     <div class="kpis"><div><div class="k">最高消費日</div><div class="kv num">${ranked[0]?`${ranked[0].d} 日 · ${money(ranked[0].v)}`:'—'}</div></div><div><div class="k">有消費日數</div><div class="kv num">${ranked.length} 日</div></div></div>
-    <div class="bars" role="group" aria-label="每日支出">${daily.map((v,i)=>`<button type="button" data-act="day" data-d="${i+1}" aria-pressed="${sel===i+1}" aria-label="${i+1}日 ${money(v)}${clippedVals.has(v)?'（已縮短顯示）':''}" ${v?'':'disabled'}>${clippedVals.has(v)&&v>scaleTop?`<i class="clip" style="height:100%"><b class="brk"></b></i>`:`<i style="height:${maxV?Math.max(2.5,Math.min(100,v/maxV*100)):2.5}%"></i>`}</button>`).join('')}</div>
+    <div class="bars" role="group" aria-label="每日支出">${daily.map((v,i)=>`<button type="button" data-act="day" data-d="${i+1}" aria-pressed="${sel===i+1}" aria-label="${i+1}日 ${money(v)}${isBig(v)?'（已縮短顯示）':''}" ${v?'':'disabled'}><i class="${isBig(v)?'clip':''}" style="height:${barH(v).toFixed(1)}%">${isBig(v)?'<b class="brk"></b>':''}</i></button>`).join('')}</div>
     <div class="bar-axis"><span>1 日</span><span>8 日</span><span>15 日</span><span>22 日</span><span>${nd} 日</span></div>
-    ${cutN?`<div class="small muted clip-note"><span class="clip-key" aria-hidden="true"><b class="brk"></b></span>有斷開符號嘅柱金額太大，已縮短顯示：${daily.map((v,i)=>({v,d:i+1})).filter(x=>clippedVals.has(x.v)&&x.v>scaleTop).map(x=>`${x.d} 日 ${money(x.v)}`).join('、')}</div>`:''}
+    ${compressed?`<div class="small muted clip-note"><span class="clip-key" aria-hidden="true"><b class="brk"></b></span><span>金額相差太大，柱高已壓縮，細額都睇得到。${bigDays.length?`有斷開符號嘅係特別大嘅日子：${bigDays.map(x=>`${x.d} 日 ${money(x.v)}`).join('、')}`:''}準確金額以撳柱後顯示為準。</span></div>`:''}
     ${noDayAmt?`<div class="small muted">另有 ${money(noDayAmt)} 未指定日子嘅支出（已計入本月支出）</div>`:''}
     ${ranked.length?`<div class="chips">${ranked.slice(0,3).map((r,i)=>`<button class="chip num" type="button" data-act="day" data-d="${r.d}" aria-pressed="${sel===r.d}">#${i+1} · ${r.d} 日 ${money(r.v)}</button>`).join('')}</div>`:''}
     ${sel?`<div class="day-detail"><b style="font-size:17px">${mm} 月 ${sel} 日 · HK${money(sum(selTx))}</b>${selTx.map(t=>{const h=+t.ts.slice(11,13);return`<button class="row" type="button" data-act="edit" data-id="${esc(t.id)}" style="background:none;border:0;padding:0;text-align:left;width:100%"><span>${t.ts.slice(11,16)} ${partOfDay(h)} · ${esc(t.merchant)}</span><b class="num">${money(t.amount)}</b></button>`}).join('')}</div>`:`<div class="empty">呢個月未有消費記錄</div>`}
