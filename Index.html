@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<base target="_top">
+<style>
+:root{
+  --ink:#16233d; --ink-2:#5b6b85; --ink-3:#8a97ab;
+  --line:rgba(22,35,61,.10);
+  --glass:rgba(255,255,255,.62); --glass-solid:rgba(255,255,255,.86);
+  --blur:saturate(180%) blur(22px);
+  --accent:#2f5bff; --warn:#c2410c; --good:#0f7b6c; --danger:#b91c1c; --amber:#a16207;
+  --r-lg:24px; --r-md:16px;
+  --shadow:0 1px 2px rgba(22,35,61,.05),0 12px 32px rgba(22,35,61,.09);
+  --inset:inset 0 1px 0 rgba(255,255,255,.9),inset 0 -1px 0 rgba(22,35,61,.03);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;color:var(--ink);
+  font-family:"PingFang HK","PingFang TC","Noto Sans HK","Microsoft JhengHei",
+              -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:15px;line-height:1.55;background:#fbfcfe;
+  -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+body::before,body::after{content:"";position:fixed;z-index:-1;border-radius:50%;
+  filter:blur(90px);pointer-events:none}
+body::before{width:620px;height:620px;top:-240px;left:-160px;
+  background:radial-gradient(circle,rgba(129,171,255,.55),transparent 70%)}
+body::after{width:680px;height:680px;bottom:-300px;right:-200px;
+  background:radial-gradient(circle,rgba(196,178,255,.45),transparent 70%)}
+.aurora{position:fixed;z-index:-1;width:520px;height:520px;top:38%;left:52%;
+  border-radius:50%;filter:blur(100px);pointer-events:none;
+  background:radial-gradient(circle,rgba(150,236,214,.42),transparent 70%)}
+
+.glass{background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  border:1px solid rgba(255,255,255,.75);border-radius:var(--r-lg);
+  box-shadow:var(--shadow),var(--inset)}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 64px}
+
+header.bar{position:sticky;top:10px;z-index:40;padding:14px 18px;margin-bottom:16px;
+  border-radius:20px}
+.brandrow{display:flex;align-items:center;gap:10px;margin-bottom:10px;min-width:0}
+.brandrow h1{font-size:19px;font-weight:650;margin:0;letter-spacing:.02em;flex:none}
+.brandrow span{font-size:12.5px;color:var(--ink-3);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.links{display:flex;gap:8px;flex-wrap:wrap}
+
+button{font:inherit;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  border:1px solid rgba(255,255,255,.8);background:var(--glass-solid);
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  color:var(--ink);text-decoration:none;padding:10px 15px;border-radius:12px;
+  font-size:14px;font-weight:500;line-height:1.3;
+  box-shadow:0 1px 2px rgba(22,35,61,.06),var(--inset);
+  transition:transform .12s ease,box-shadow .18s ease}
+.btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(22,35,61,.12),var(--inset)}
+.btn:active{transform:translateY(0)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:linear-gradient(180deg,#4b74ff,#2f5bff);color:#fff;
+  border-color:rgba(47,91,255,.5);
+  box-shadow:0 2px 6px rgba(47,91,255,.30),inset 0 1px 0 rgba(255,255,255,.35)}
+.btn.ghost{background:rgba(255,255,255,.45);padding:7px 12px;font-size:13px;color:var(--ink-2)}
+.btn.sm{padding:6px 12px;font-size:13px;border-radius:10px}
+.btn.danger{color:var(--danger);border-color:rgba(185,28,28,.25);background:rgba(185,28,28,.06)}
+.btn[disabled]{opacity:.45;pointer-events:none}
+
+.banner{display:none;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:13px 16px;border-radius:var(--r-md);margin-bottom:16px;
+  background:rgba(255,244,214,.75);border:1px solid rgba(161,98,7,.22);
+  color:#7a4b06;font-size:14px}
+.banner.on{display:flex}
+.banner.err{background:rgba(254,226,226,.8);border-color:rgba(185,28,28,.25);color:#8a1c1c}
+.banner.pv{background:rgba(47,91,255,.08);border-color:rgba(47,91,255,.25);color:#1e3a9a}
+.banner b{font-weight:650}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat{padding:15px 17px;border-radius:var(--r-md)}
+.stat b{display:block;font-size:26px;font-weight:600;letter-spacing:-.01em;
+  font-variant-numeric:tabular-nums;line-height:1.15}
+.stat i{font-style:normal;font-size:12.5px;color:var(--ink-2)}
+
+.tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+.seg{display:inline-flex;padding:3px;border-radius:13px;background:rgba(255,255,255,.55);
+  border:1px solid rgba(255,255,255,.8);backdrop-filter:var(--blur);box-shadow:var(--inset)}
+.seg button{border:0;background:transparent;padding:8px 15px;border-radius:10px;
+  font-size:13.5px;color:var(--ink-2);transition:all .16s ease}
+.seg button[aria-pressed="true"]{background:#fff;color:var(--ink);font-weight:600;
+  box-shadow:0 1px 4px rgba(22,35,61,.12)}
+.search{flex:1;min-width:170px}
+.search input{width:100%;padding:10px 14px;border-radius:12px;font:inherit;font-size:16px;
+  border:1px solid rgba(255,255,255,.85);background:rgba(255,255,255,.6);
+  backdrop-filter:var(--blur);color:var(--ink);box-shadow:var(--inset)}
+.search input:focus{outline:2px solid var(--accent);outline-offset:1px;background:#fff}
+
+.card{overflow:hidden}
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:12px 16px;text-align:left;white-space:nowrap}
+thead th{font-size:12.5px;font-weight:600;color:var(--ink-2);
+  background:rgba(255,255,255,.5);border-bottom:1px solid var(--line)}
+tbody tr{border-bottom:1px solid rgba(22,35,61,.06)}
+tbody tr:last-child{border-bottom:0}
+tbody tr:hover{background:rgba(255,255,255,.55)}
+td.num{font-variant-numeric:tabular-nums;font-weight:550}
+.name{font-weight:600}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+.pill.ok{background:rgba(15,123,108,.12);color:var(--good)}
+.pill.due{background:rgba(194,65,12,.12);color:var(--warn)}
+.pill.zero{background:rgba(22,35,61,.06);color:var(--ink-3)}
+.pill.info{background:rgba(47,91,255,.10);color:var(--accent)}
+.tag-def{font-size:11.5px;color:var(--ink-3);margin-left:6px;font-weight:400}
+.empty{padding:52px 22px;text-align:center;color:var(--ink-2)}
+.empty p{margin:6px 0}
+
+.overlay{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+  padding:14px;background:rgba(22,35,61,.20);backdrop-filter:blur(6px)}
+.overlay.on{display:flex}
+.modal{width:100%;max-width:920px;max-height:92vh;display:flex;flex-direction:column;
+  background:rgba(255,255,255,.88);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  border:1px solid rgba(255,255,255,.9);border-radius:var(--r-lg);
+  box-shadow:0 24px 70px rgba(22,35,61,.24),var(--inset);
+  animation:pop .22s cubic-bezier(.2,.9,.3,1)}
+@keyframes pop{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+.modal header{display:flex;align-items:center;gap:10px;padding:16px 20px;
+  border-bottom:1px solid var(--line);flex-wrap:wrap}
+.modal header h2{margin:0;font-size:17px;font-weight:650}
+.modal header .sub{font-size:12.5px;color:var(--ink-3)}
+.modal .body{padding:16px 20px;overflow:auto;-webkit-overflow-scrolling:touch}
+.modal footer{display:flex;gap:9px;justify-content:flex-end;padding:13px 20px;
+  border-top:1px solid var(--line);flex-wrap:wrap;align-items:center}
+.modal footer .spacer{margin-right:auto;font-size:12.5px;color:var(--ink-2);
+  display:flex;align-items:center;gap:7px}
+.x{margin-left:auto;border:0;background:rgba(22,35,61,.06);width:32px;height:32px;
+  border-radius:9px;font-size:17px;color:var(--ink-2);line-height:1}
+
+label.f{display:block;font-size:12.5px;color:var(--ink-2);margin:0 0 5px}
+select,input[type=date],input[type=text]{font:inherit;font-size:16px;padding:9px 11px;
+  border-radius:10px;border:1px solid rgba(22,35,61,.14);background:rgba(255,255,255,.9);
+  color:var(--ink);width:100%;-webkit-appearance:none;appearance:none}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--ink-2) 50%),
+  linear-gradient(135deg,var(--ink-2) 50%,transparent 50%);
+  background-position:calc(100% - 17px) 50%,calc(100% - 12px) 50%;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:32px}
+select:focus,input:focus{outline:2px solid var(--accent);outline-offset:1px}
+input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent);flex:none;
+  -webkit-appearance:auto;appearance:auto}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.field{margin-bottom:13px}
+.hint{font-size:12.5px;color:var(--ink-3);margin:6px 0 0}
+.notice{font-size:13px;color:var(--ink-2);background:rgba(47,91,255,.06);
+  border:1px solid rgba(47,91,255,.14);border-radius:12px;padding:10px 13px;margin:0 0 14px}
+.status{font-size:13px;border-radius:12px;padding:10px 13px;margin:12px 0 0}
+.status.good{background:rgba(15,123,108,.08);border:1px solid rgba(15,123,108,.2);color:var(--good)}
+.status.bad{background:rgba(194,65,12,.08);border:1px solid rgba(194,65,12,.2);color:var(--warn)}
+.status.wait{background:rgba(47,91,255,.07);border:1px solid rgba(47,91,255,.18);color:var(--accent)}
+.section{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+.section h3{margin:0 0 8px;font-size:14px;font-weight:650}
+
+.rosterbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px}
+.rosterbar .lab{font-size:12.5px;color:var(--ink-2);min-width:60px}
+
+.tally{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 14px}
+.tally span{font-size:12.5px;padding:5px 11px;border-radius:999px;font-weight:600;
+  background:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.85);color:var(--ink-2)}
+.atlist{display:flex;flex-direction:column;gap:6px}
+.atrow{display:grid;grid-template-columns:132px 1fr 1fr 1.3fr;gap:10px;align-items:center;
+  padding:9px 12px;border-radius:11px;background:rgba(255,255,255,.62);
+  border:1px solid rgba(255,255,255,.85);font-size:13.5px}
+.atrow.absent{background:rgba(255,213,178,.4);border-color:rgba(194,65,12,.16)}
+.atrow.exempt{background:rgba(47,91,255,.05)}
+.atrow .dt{font-weight:600;font-variant-numeric:tabular-nums}
+.atrow .wd{color:var(--ink-3);font-weight:400;margin-left:4px}
+.atrow .half{color:var(--ink-3);font-size:11.5px;margin-right:5px}
+.atrow .extra{font-size:12.5px;color:var(--ink-2)}
+.st{font-weight:600}
+.st.present{color:var(--good)}
+.st.late{color:var(--amber)}
+.st.absent{color:var(--warn)}
+.st.exempt{color:var(--accent)}
+.actbtns{display:flex;gap:6px;justify-content:flex-end}
+.rlist{display:flex;flex-direction:column;gap:7px}
+.rrow{display:grid;grid-template-columns:1.15fr auto auto .9fr;gap:10px;align-items:center;
+  padding:10px 12px;border-radius:13px;background:rgba(255,255,255,.55);
+  border:1px solid rgba(255,255,255,.8)}
+.rrow.leave{background:rgba(255,213,178,.42);border-color:rgba(194,65,12,.18)}
+.rname b{font-weight:600}
+.rgrp{display:inline-flex;align-items:center;gap:6px}
+.rgrp>.gl{font-size:11.5px;color:var(--ink-3);flex:none}
+.tri{display:inline-flex;background:rgba(22,35,61,.05);border-radius:10px;padding:2px}
+.tri button{border:0;background:transparent;padding:6px 8px;border-radius:8px;
+  font-size:12.5px;color:var(--ink-2);line-height:1.2;transition:all .14s;white-space:nowrap}
+.tri button[aria-pressed="true"]{background:#fff;font-weight:600;color:var(--ink);
+  box-shadow:0 1px 4px rgba(22,35,61,.14)}
+.tri button[aria-pressed="true"][data-v="遲到"],
+.tri button[aria-pressed="true"][data-v="早退"]{color:var(--amber)}
+.tri button[aria-pressed="true"][data-v="缺席"]{color:var(--warn)}
+.tri button[aria-pressed="true"][data-v="豁免"]{color:var(--accent)}
+.rrow input[type=text]{font-size:14px;padding:7px 9px}
+.flag{font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;margin-left:5px}
+.flag.file{background:rgba(15,123,108,.13);color:var(--good)}
+.flag.res{background:rgba(47,91,255,.11);color:var(--accent)}
+
+.checkrow{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px}
+.checkrow label{flex:1;min-width:0}
+
+.detail-list{display:flex;flex-direction:column;gap:8px}
+.detail-item{display:grid;grid-template-columns:22px 104px 1fr auto auto;gap:10px;align-items:center;
+  padding:11px 13px;border-radius:12px;background:rgba(255,255,255,.65);
+  border:1px solid rgba(255,255,255,.85)}
+.detail-item .d{font-weight:600;font-variant-numeric:tabular-nums}
+.detail-item .s{font-size:13px;color:var(--ink-2)}
+.detail-item a{color:var(--accent);text-decoration:none;font-size:12px;font-weight:600}
+.detail-item .nochk{width:22px}
+
+.hlist{display:flex;flex-direction:column;gap:7px;margin-top:6px}
+.hitem{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;
+  padding:9px 12px;border-radius:11px;background:rgba(255,255,255,.6);
+  border:1px solid rgba(255,255,255,.85);font-size:13.5px}
+.hitem.nochk{grid-template-columns:1fr auto}
+
+.filepick{display:flex;gap:9px;flex-wrap:wrap}
+.filepick .btn{flex:1;min-width:130px}
+.filename{margin-top:9px;font-size:13px;color:var(--ink-2);word-break:break-all}
+
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+  z-index:90;padding:11px 18px;border-radius:14px;font-size:14px;opacity:0;
+  background:rgba(255,255,255,.94);backdrop-filter:var(--blur);
+  border:1px solid rgba(255,255,255,.9);box-shadow:0 12px 34px rgba(22,35,61,.18);
+  transition:opacity .22s,transform .22s;pointer-events:none;max-width:90vw;text-align:center}
+#toast.on{opacity:1;transform:translateX(-50%)}
+#toast.err{color:var(--warn)}
+#busy{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;
+  background:rgba(251,252,254,.55);backdrop-filter:blur(3px)}
+#busy.on{display:flex}
+.spin{width:34px;height:34px;border-radius:50%;border:3px solid rgba(47,91,255,.18);
+  border-top-color:var(--accent);animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+@media (max-width:860px){
+  .rrow{grid-template-columns:1fr;gap:8px}
+  .rrow .rname{margin-bottom:2px}
+}
+@media (max-width:760px){
+  .wrap{padding:14px 12px 56px}
+  header.bar{top:6px;padding:12px 14px;border-radius:18px}
+  .brandrow h1{font-size:17px}
+  .acts .btn{flex:1 1 calc(50% - 4px);min-width:0;padding:10px 8px;font-size:13.5px}
+  .links .btn{flex:1 1 calc(50% - 4px);min-width:0}
+  .stats{grid-template-columns:1fr 1fr;gap:10px}
+  .stat{padding:13px 14px}
+  .stat b{font-size:23px}
+  .seg{width:100%}
+  .seg button{flex:1;padding:9px 4px;font-size:13px}
+  .grid2,.grid3{grid-template-columns:1fr}
+
+  thead{display:none}
+  table,tbody,tbody tr,tbody td{display:block;width:100%}
+  tbody tr{padding:12px 15px;border-bottom:1px solid rgba(22,35,61,.08)}
+  tbody td{display:flex;justify-content:space-between;align-items:center;gap:12px;
+    padding:4px 0;white-space:normal;font-size:14px}
+  tbody td::before{content:attr(data-l);font-size:12.5px;color:var(--ink-2);flex:none}
+  tbody td.hd{padding:0 0 6px;font-size:16px}
+  tbody td.hd::before{content:none}
+  tbody td.act{display:block;padding-top:10px}
+  tbody td.act::before{content:none}
+  tbody td.act .actbtns{width:100%}
+  tbody td.act .actbtns .btn{flex:1}
+
+  .atrow{grid-template-columns:1fr 1fr;gap:5px 10px}
+  .atrow .dt{grid-column:1/-1}
+  .atrow .extra{grid-column:1/-1}
+
+  .modal{max-height:94vh;border-radius:20px}
+  .modal footer .btn{flex:1;min-width:110px}
+  .modal footer .spacer{width:100%;margin:0 0 6px}
+  .tri{width:100%}
+  .tri button{flex:1;padding:8px 2px}
+  .rgrp{width:100%}
+  .detail-item{grid-template-columns:22px 1fr auto;gap:6px 10px}
+  .detail-item .s{grid-column:1/-1}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="aurora"></div>
+
+<div class="wrap">
+  <header class="bar glass">
+    <div class="brandrow">
+      <h1>學生請假系統</h1>
+      <span id="who"><?= userEmail ?></span>
+    </div>
+    <div class="acts">
+      <button class="btn primary" id="btnAdd">新增／修改出席記錄</button>
+      <button class="btn" id="btnProof">交證明文件</button>
+      <button class="btn" id="btnHoliday">假期更新</button>
+      <button class="btn" id="btnExport">匯出記錄</button>
+    </div>
+    <div class="links">
+      <a class="btn ghost" id="lnkSheet" href="#" target="_blank" rel="noopener">開啟試算表</a>
+      <button class="btn ghost" id="btnReload">重新整理</button>
+    </div>
+  </header>
+
+  <div class="banner err" id="errBanner">
+    <span id="errMsg"></span>
+    <button class="btn sm" id="errClose">知道了</button>
+  </div>
+
+  <div class="banner" id="gapBanner">
+    <span id="gapMsg"></span>
+    <button class="btn sm" id="gapOpen">處理</button>
+  </div>
+
+  <section class="stats">
+    <div class="stat glass"><b id="sStu">–</b><i>學生人數</i></div>
+    <div class="stat glass"><b id="sLeave">–</b><i>請假總日數</i></div>
+    <div class="stat glass"><b id="sDone">–</b><i>已交文件日數</i></div>
+    <div class="stat glass"><b id="sDue">–</b><i>未交文件日數</i></div>
+  </section>
+
+  <div class="tools">
+    <div class="seg" id="segTerm">
+      <button data-term="上學期" aria-pressed="true">上學期</button>
+      <button data-term="下學期" aria-pressed="false">下學期</button>
+      <button data-term="全年" aria-pressed="false">全年</button>
+    </div>
+    <div class="search"><input id="q" type="text" placeholder="搜尋班別、學號或姓名"></div>
+  </div>
+
+  <section class="card glass">
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>班別</th><th>學號</th><th>姓名</th>
+          <th>請假日數</th><th>已交文件</th><th>未交文件</th><th>免交</th><th></th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty" style="display:none">
+      <p>學生名單還是空的。</p>
+      <p>開啟試算表，在「學生名單」分頁貼上班別、學號、姓名，再回來重新整理。</p>
+    </div>
+  </section>
+</div>
+
+<!-- 詳情 -->
+<div class="overlay" id="mDetail">
+  <div class="modal" style="max-width:820px">
+    <header><h2 id="dTitle">請假詳情</h2><span class="sub" id="dSub"></span>
+      <button class="x" data-close>&times;</button></header>
+    <div class="body"><div class="detail-list" id="dList"></div></div>
+    <footer>
+      <span class="spacer">
+        <input type="checkbox" id="dAll">
+        <label for="dAll">全選</label>
+        <span id="dCount"></span>
+      </span>
+      <button class="btn" id="dUnmark">改為未交</button>
+      <button class="btn primary" id="dMark">標記為已交</button>
+      <button class="btn" data-close>關閉</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 出席記錄 -->
+<div class="overlay" id="mAttend">
+  <div class="modal" style="max-width:860px">
+    <header><h2 id="atTitle">出席記錄</h2><span class="sub" id="atSub"></span>
+      <button class="x" data-close>&times;</button></header>
+    <div class="body">
+      <div class="grid3">
+        <div class="field"><label class="f" for="atFrom">開始日期</label>
+          <input type="date" id="atFrom"></div>
+        <div class="field"><label class="f" for="atTo">結束日期</label>
+          <input type="date" id="atTo"></div>
+        <div class="field"><label class="f">&nbsp;</label>
+          <button class="btn" id="atGo" style="width:100%">查詢</button></div>
+      </div>
+      <div class="tally" id="atTally"></div>
+      <div class="atlist" id="atList"></div>
+    </div>
+    <footer>
+      <span class="spacer" id="atCount"></span>
+      <button class="btn" id="atReset">回到學期初</button>
+      <button class="btn" data-close>關閉</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 編輯單筆 -->
+<div class="overlay" id="mEdit">
+  <div class="modal" style="max-width:520px">
+    <header><h2>編輯記錄</h2><span class="sub" id="eSub"></span>
+      <button class="x" data-close>&times;</button></header>
+    <div class="body">
+      <div class="grid2">
+        <div class="field"><label class="f">上午</label><select id="edAm"></select></div>
+        <div class="field"><label class="f">下午</label><select id="edPm"></select></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label class="f">請假類別</label><select id="edType"></select></div>
+        <div class="field"><label class="f">文件狀態</label><select id="edMark"></select></div>
+      </div>
+      <div class="field"><label class="f">備註</label>
+        <input type="text" id="edRemark" placeholder="例如：家長已致電"></div>
+      <p class="hint">上午、下午各 0.5 日。出席、遲到、早退不用交文件；豁免不計請假；公假免交。</p>
+    </div>
+    <footer>
+      <button class="btn danger" id="edDel">刪除這筆</button>
+      <button class="btn" data-close>取消</button>
+      <button class="btn primary" id="edSave">儲存</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 新增／修改出席記錄 -->
+<div class="overlay" id="mRoster">
+  <div class="modal">
+    <header><h2>新增／修改出席記錄</h2><span class="sub" id="rSub"></span>
+      <button class="x" data-close>&times;</button></header>
+    <div class="body">
+      <div class="field" style="max-width:220px"><label class="f" for="rDate">日期</label>
+        <input type="date" id="rDate"></div>
+      <div class="rosterbar">
+        <span class="lab">全班上午</span>
+        <button class="btn sm" data-all="出席" data-half="am">出席</button>
+        <button class="btn sm" data-all="缺席" data-half="am">缺席</button>
+        <button class="btn sm" data-all="豁免" data-half="am">豁免</button>
+      </div>
+      <div class="rosterbar">
+        <span class="lab">全班下午</span>
+        <button class="btn sm" data-all="出席" data-half="pm">出席</button>
+        <button class="btn sm" data-all="缺席" data-half="pm">缺席</button>
+        <button class="btn sm" data-all="豁免" data-half="pm">豁免</button>
+      </div>
+      <div class="rosterbar">
+        <span class="lab">全日</span>
+        <button class="btn sm" data-all="出席" data-half="both">出席</button>
+        <button class="btn sm" data-all="缺席" data-half="both">缺席</button>
+        <button class="btn sm" data-all="豁免" data-half="both">豁免</button>
+        <button class="btn sm" data-all="reset" data-half="both">還原預設</button>
+      </div>
+      <div class="rlist" id="rList"></div>
+    </div>
+    <footer>
+      <button class="btn danger" id="rDelDay" style="margin-right:auto">刪除當日全班記錄</button>
+      <button class="btn" data-close>取消</button>
+      <button class="btn primary" id="rSave">儲存記錄</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 交證明文件 -->
+<div class="overlay" id="mProof">
+  <div class="modal" style="max-width:620px">
+    <header><h2>交證明文件</h2><button class="x" data-close>&times;</button></header>
+    <div class="body">
+      <p class="notice">選擇學生、請假類別和日期，然後設定文件狀態（已交／未交）。公假免交。可以預先登記將來的日子，到那天設為缺席時自動套用。</p>
+      <div class="field"><label class="f" for="pStu">學生</label><select id="pStu"></select></div>
+      <div class="field"><label class="f" for="pLeave">請假類別</label><select id="pLeave"></select></div>
+      <div class="grid2">
+        <div class="field"><label class="f" for="pFrom">涵蓋日期（開始）</label>
+          <input type="date" id="pFrom"></div>
+        <div class="field"><label class="f" for="pTo">涵蓋日期（結束）</label>
+          <input type="date" id="pTo"></div>
+      </div>
+      <div class="status wait" id="pStatus">請選擇學生和日期。</div>
+      <div id="pMarkWrap" style="margin-top:14px">
+        <div class="field"><label class="f" for="pMark">文件狀態</label>
+          <select id="pMark"><option>已交</option><option>未交</option></select></div>
+      </div>
+      <div class="section">
+        <h3>這位學生的預約</h3>
+        <p class="hint" style="margin:0 0 6px">未到期的預約。刪除只會取消自動套用。</p>
+        <div class="hlist" id="resList"></div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="checkbox" id="resAll"><label for="resAll" style="font-size:13px">全選</label>
+          <button class="btn sm danger" id="resDel">刪除選取的預約</button>
+        </div>
+      </div>
+    </div>
+    <footer>
+      <button class="btn" data-close>取消</button>
+      <button class="btn primary" id="pSave">儲存</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 假期更新 -->
+<div class="overlay" id="mHoliday">
+  <div class="modal" style="max-width:600px">
+    <header><h2>假期更新</h2><span class="sub" id="hSub"></span>
+      <button class="x" data-close>&times;</button></header>
+    <div class="body">
+      <p class="notice">星期六、日已預設不用上課，不用在這裡填。
+        如果假期那天有活動，照樣可以在「新增／修改出席記錄」揀那日點名，缺席照計。</p>
+      <div class="grid3">
+        <div class="field"><label class="f" for="hFrom">開始日期</label>
+          <input type="date" id="hFrom"></div>
+        <div class="field"><label class="f" for="hTo">結束日期</label>
+          <input type="date" id="hTo"></div>
+        <div class="field"><label class="f" for="hNote">說明</label>
+          <input type="text" id="hNote" placeholder="例如：聖誕假"></div>
+      </div>
+      <p class="hint">加入假期後，該段日子已有的出席記錄會刪走。</p>
+      <div class="section"><h3>已登記的假期</h3><div class="hlist" id="hList"></div></div>
+    </div>
+    <footer>
+      <button class="btn" id="hFill" style="display:none">不是假期，照預設補填</button>
+      <button class="btn" data-close>關閉</button>
+      <button class="btn primary" id="hSave">加入假期</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 匯出 -->
+<div class="overlay" id="mExport">
+  <div class="modal" style="max-width:600px">
+    <header><h2>匯出請假記錄</h2><button class="x" data-close>&times;</button></header>
+    <div class="body">
+      <div class="field"><label class="f" for="exTerm">學期</label><select id="exTerm">
+        <option>上學期</option><option>下學期</option><option>全年</option></select></div>
+      <div class="checkrow" style="border-bottom:1px solid var(--line);border-radius:0">
+        <input type="checkbox" id="exAll"><label for="exAll" style="font-weight:600">全選</label>
+        <span id="exCount" style="color:var(--ink-3);font-size:12.5px;flex:none"></span>
+      </div>
+      <div id="exList" style="max-height:46vh;overflow:auto;margin-top:6px"></div>
+    </div>
+    <footer>
+      <button class="btn" data-close>取消</button>
+      <button class="btn" id="exSheet">建立 Google Sheet</button>
+      <button class="btn primary" id="exCsv">下載 CSV</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 完成連結 -->
+<div class="overlay" id="mLink">
+  <div class="modal" style="max-width:440px">
+    <header><h2 id="lTitle">已完成</h2><button class="x" data-close>&times;</button></header>
+    <div class="body"><p id="lMsg" style="margin:0"></p><p class="hint" id="lNote"></p></div>
+    <footer>
+      <button class="btn" data-close>關閉</button>
+      <a class="btn primary" id="lOpen" href="#" target="_blank" rel="noopener">開啟檔案</a>
+    </footer>
+  </div>
+</div>
+
+<div id="busy"><div class="spin"></div></div>
+<div id="toast"></div>
+
+<script>
+var APP = { summary: [], statuses: [], presentSet: [], leaveTypes: [], exemptTypes: [], term: '上學期', today: '', gap: null, terms: {},
+            editing: null, detailId: null, attendId: null, gapMode: false };
+
+function $(id){ return document.getElementById(id); }
+function busy(on){ $('busy').classList.toggle('on', !!on); }
+function toast(msg, isErr){
+  var t = $('toast'); t.textContent = msg; t.className = isErr ? 'on err' : 'on';
+  clearTimeout(t._h); t._h = setTimeout(function(){ t.className = ''; }, isErr ? 5600 : 2800);
+}
+function showError(msg){
+  $('errMsg').textContent = msg;
+  $('errBanner').classList.add('on');
+}
+$('errClose').onclick = function(){ $('errBanner').classList.remove('on'); };
+
+/** 所有伺服器呼叫都經過這裡：出錯或 45 秒無回應都會顯示錯誤。 */
+function srv(tag, ok, err){
+  var done = false;
+  function fail(e){
+    if (done) return;
+    done = true; clearTimeout(timer); busy(false);
+    var msg = (e && e.message) ? e.message : String(e || '未知錯誤');
+    if (err) { try { err({ message: msg }); } catch (x) {} }
+    else toast(msg, true);
+    showError(tag + '：' + msg);
+  }
+  var timer = setTimeout(function(){
+    fail(new Error('伺服器 45 秒內沒有回應。請重新整理頁面再試；如果持續發生，在 Apps Script 編輯器執行一次 repairData() 看看錯誤訊息。'));
+  }, 45000);
+
+  return google.script.run
+    .withSuccessHandler(function(res){
+      if (done) return;
+      done = true; clearTimeout(timer);
+      try {
+        if (res === null || res === undefined) throw new Error('伺服器回傳空白結果');
+        ok(res);
+      } catch (e) {
+        busy(false);
+        var msg = (e && e.message) ? e.message : String(e);
+        if (err) { try { err({ message: msg }); } catch (x) {} } else toast(msg, true);
+        showError(tag + '（畫面處理）：' + msg);
+      }
+    })
+    .withFailureHandler(fail);
+}
+
+/**
+ * 顯示用姓名：Chan Tai Man → Chan TM（第一個字是姓，其餘取首字母）。
+ * 亦接受「CHAN, Tai Man」、連字號「Chan Tai-man」。中文姓名照原樣顯示。
+ */
+function dn(full){
+  var n = String(full == null ? '' : full).trim().replace(/\s+/g, ' ');
+  if (!n || /[\u3400-\u9fff]/.test(n)) return n;
+  var surname, rest;
+  if (n.indexOf(',') > -1) {
+    var c = n.split(',');
+    surname = c[0].trim(); rest = c.slice(1).join(' ');
+  } else {
+    var w = n.split(' ');
+    if (w.length < 2) return n;
+    surname = w[0]; rest = w.slice(1).join(' ');
+  }
+  var ini = rest.split(/[\s\-]+/).filter(function(x){ return /[A-Za-z]/.test(x); })
+    .map(function(x){ return x.replace(/[^A-Za-z]/g, '').charAt(0).toUpperCase(); }).join('');
+  if (surname === surname.toUpperCase())
+    surname = surname.charAt(0) + surname.slice(1).toLowerCase();
+  return ini ? surname + ' ' + ini : surname;
+}
+function open_(id){ $(id).classList.add('on'); }
+function close_(el){ if (el) el.classList.remove('on'); }
+function esc(s){ return String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function num(n){ return (Math.round((Number(n)||0)*100)/100).toString(); }
+function opts(sel, list){
+  sel.innerHTML = (list || []).map(function(s){ return '<option>' + esc(s) + '</option>'; }).join('');
+}
+function studentOpts(sel, withAll){
+  var h = withAll ? '<option value="">全部學生</option>' : '';
+  sel.innerHTML = h + APP.summary.map(function(s){
+    return '<option value="' + esc(s.id) + '">' +
+      esc(s.cls + ' ' + s.id + ' ' + dn(s.name)) + '</option>';
+  }).join('');
+}
+function showLink(title, msg, url, note){
+  $('lTitle').textContent = title; $('lMsg').textContent = msg;
+  $('lNote').textContent = note || '';
+  if (url) { $('lOpen').href = url; $('lOpen').style.display = ''; }
+  else { $('lOpen').style.display = 'none'; }
+  open_('mLink');
+}
+function checkedVals(sel){
+  return Array.prototype.filter.call(document.querySelectorAll(sel), function(c){ return c.checked; })
+    .map(function(c){ return c.value; });
+}
+function show(id, on){ $(id).style.display = on ? '' : 'none'; }
+document.addEventListener('click', function(e){
+  var t = e.target;
+  if (t && t.hasAttribute && t.hasAttribute('data-close')) close_(t.closest('.overlay'));
+});
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') close_(document.querySelector('.overlay.on'));
+});
+
+/* ---- 載入 ---- */
+function boot(){
+  busy(true);
+  srv('載入系統', function(d){
+    busy(false);
+    APP.summary = d.summary || []; APP.statuses = d.statuses || [];
+    APP.presentSet = d.presentSet || []; APP.leaveTypes = d.leaveTypes || [];
+    APP.exemptTypes = d.exemptTypes || []; APP.today = d.today; APP.gap = d.pendingGap;
+    APP.terms = d.terms || {};
+    $('who').textContent = d.user + (d.version ? '　·　' + d.version : '');
+    $('lnkSheet').href = d.sheetUrl || '#';
+    opts($('pLeave'), APP.leaveTypes);
+    opts($('edAm'), APP.statuses);
+    opts($('edPm'), APP.statuses);
+    opts($('edType'), ['未分類'].concat(APP.leaveTypes));
+    opts($('edMark'), ['未交', '已交']);
+    showGap();
+    render();
+  }).apiBootstrap();
+}
+
+function showGap(){
+  var g = APP.gap;
+  if (!g) { $('gapBanner').classList.remove('on'); return; }
+  $('gapMsg').innerHTML = '有 <b>' + g.days + '</b> 個上課日未填記錄（' +
+    esc(g.from) + ' 至 ' + esc(g.to) + '）。是假期嗎？';
+  $('gapBanner').classList.add('on');
+}
+
+function refresh(quiet){
+  busy(true);
+  srv('更新總覽', function(s){
+    busy(false); APP.summary = s; render(); if (!quiet) toast('已更新');
+  }).apiSummary();
+}
+
+/* ---- 總覽 ---- */
+function render(){
+  var q = ($('q').value || '').trim().toLowerCase();
+  var rows = APP.summary.filter(function(s){
+    return !q || (s.cls + ' ' + s.id + ' ' + s.name + ' ' + dn(s.name)).toLowerCase().indexOf(q) > -1;
+  });
+
+  var tl = 0, td = 0, tp = 0;
+  $('tbody').innerHTML = rows.map(function(s){
+    var t = (s.terms && s.terms[APP.term]) || { leave:0, done:0, pending:0, exempt:0 };
+    tl += t.leave; td += t.done; tp += t.pending;
+    var duePill = t.pending > 0 ? '<span class="pill due">' + num(t.pending) + ' 日</span>'
+      : (t.leave ? '<span class="pill ok">無</span>' : '<span class="pill zero">—</span>');
+    var exPill = t.exempt > 0 ? '<span class="pill info">' + num(t.exempt) + ' 日</span>'
+      : '<span class="pill zero">—</span>';
+    return '<tr>' +
+      '<td data-l="班別">' + esc(s.cls) + '</td>' +
+      '<td data-l="學號">' + esc(s.id) + '</td>' +
+      '<td class="name hd" data-l="姓名">' + esc(dn(s.name)) +
+        (s.def !== '出席' ? '<span class="tag-def">預設' + esc(s.def) +
+          (s.defType ? '·' + esc(s.defType) : '') + '</span>' : '') + '</td>' +
+      '<td class="num" data-l="請假日數">' + num(t.leave) + '</td>' +
+      '<td class="num" data-l="已交文件">' + num(t.done) + '</td>' +
+      '<td data-l="未交文件">' + duePill + '</td>' +
+      '<td data-l="免交（公假）">' + exPill + '</td>' +
+      '<td class="act"><span class="actbtns">' +
+        '<button class="btn sm" data-detail="' + esc(s.id) + '">詳情</button>' +
+        '<button class="btn sm" data-attend="' + esc(s.id) + '">出席記錄</button>' +
+      '</span></td>' +
+      '</tr>';
+  }).join('');
+
+  $('empty').style.display = APP.summary.length ? 'none' : 'block';
+  $('sStu').textContent = APP.summary.length;
+  $('sLeave').textContent = num(tl);
+  $('sDone').textContent = num(td);
+  $('sDue').textContent = num(tp);
+
+  Array.prototype.forEach.call($('tbody').querySelectorAll('[data-detail]'), function(b){
+    b.onclick = function(){ showDetail(b.getAttribute('data-detail')); };
+  });
+  Array.prototype.forEach.call($('tbody').querySelectorAll('[data-attend]'), function(b){
+    b.onclick = function(){ showAttend(b.getAttribute('data-attend')); };
+  });
+}
+
+$('q').addEventListener('input', render);
+$('btnReload').onclick = function(){ refresh(); };
+Array.prototype.forEach.call($('segTerm').querySelectorAll('button'), function(b){
+  b.onclick = function(){
+    Array.prototype.forEach.call($('segTerm').querySelectorAll('button'), function(x){
+      x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+    });
+    APP.term = b.getAttribute('data-term'); render();
+  };
+});
+
+/* ---- 文件狀態標籤 ---- */
+function docTag(r){
+  if (r.state === 'exempt') return '<span class="pill info">免交</span>';
+  if (r.state === 'done') return '<span class="pill ok">已交</span>';
+  return '<span class="pill due">未交</span>';
+}
+
+/* ---- 詳情 ---- */
+function showDetail(id){
+  var stu = APP.summary.filter(function(s){ return s.id === id; })[0] || {};
+  APP.detailId = id;
+  $('dTitle').textContent = dn(stu.name) + '　請假詳情';
+  $('dSub').textContent = APP.term + '　·　上午下午各 0.5 日';
+  $('dList').innerHTML = '<p class="hint">載入中…</p>';
+  $('dAll').checked = false; $('dCount').textContent = '';
+  open_('mDetail');
+  loadDetail(id);
+}
+
+function loadDetail(id){
+  srv('讀取詳情', function(list){
+    if (!list.length) {
+      $('dList').innerHTML = '<p class="hint">這個學期沒有請假記錄。</p>';
+      countDetail(); return;
+    }
+    $('dList').innerHTML = list.map(function(r){
+      var span = (r.am === '缺席' && r.pm === '缺席') ? '全日缺席'
+               : (r.am === '缺席' ? '上午缺席（下午' + esc(r.pm) + '）'
+                                  : '下午缺席（上午' + esc(r.am) + '）');
+      var canChk = r.state !== 'exempt';
+      var chk = canChk
+        ? '<input type="checkbox" class="dchk" value="' + esc(r.date) + '">'
+        : '<span class="nochk"></span>';
+      return '<div class="detail-item">' + chk +
+        '<span class="d">' + esc(r.date) + '</span>' +
+        '<span class="s">' + span + '　·　' + num(r.days) + ' 日　·　' +
+          esc(r.ltype || '未分類') +
+          (r.remark ? '　·　' + esc(r.remark) : '') + '</span>' +
+        '<span>' + docTag(r) + '</span>' +
+        '<button class="btn sm" data-edit="' + esc(r.date) + '">編輯</button></div>';
+    }).join('');
+    Array.prototype.forEach.call($('dList').querySelectorAll('[data-edit]'), function(b){
+      b.onclick = function(){ openEdit(id, b.getAttribute('data-edit')); };
+    });
+    Array.prototype.forEach.call($('dList').querySelectorAll('.dchk'), function(c){
+      c.onchange = countDetail;
+    });
+    countDetail();
+  }, function(e){
+    $('dList').innerHTML = '<p class="hint">讀取失敗：' + esc(e.message) + '</p>';
+  }).apiDetail(id, APP.term);
+}
+
+function countDetail(){
+  var n = checkedVals('.dchk').length;
+  $('dCount').textContent = n ? '已選 ' + n + ' 筆' : '';
+  $('dMark').disabled = !n;
+  $('dUnmark').disabled = !n;
+}
+$('dAll').onchange = function(){
+  var v = this.checked;
+  Array.prototype.forEach.call(document.querySelectorAll('.dchk'), function(c){ c.checked = v; });
+  countDetail();
+};
+function setMarks(mark){
+  var dates = checkedVals('.dchk');
+  if (!dates.length) return;
+  busy(true);
+  srv('更新文件狀態', function(res){
+    busy(false);
+    toast('已把 ' + res.changed + ' 筆改為' + (mark ? '已交' : '未交'));
+    $('dAll').checked = false;
+    loadDetail(APP.detailId); refresh(true);
+  }).apiSetMarks(APP.detailId, dates, mark ? '已交' : '');
+}
+$('dMark').onclick = function(){ setMarks(true); };
+$('dUnmark').onclick = function(){ setMarks(false); };
+
+/* ---- 出席記錄 ---- */
+var WD = ['日', '一', '二', '三', '四', '五', '六'];
+function weekdayOf(dateStr){
+  var p = String(dateStr || '').split('-');
+  if (p.length !== 3) return '';
+  return '（' + WD[new Date(+p[0], +p[1] - 1, +p[2]).getDay()] + '）';
+}
+function stClass(s){
+  if (s === '缺席') return 'absent';
+  if (s === '遲到' || s === '早退') return 'late';
+  if (s === '豁免') return 'exempt';
+  return 'present';
+}
+
+function showAttend(id){
+  var stu = APP.summary.filter(function(s){ return s.id === id; })[0] || {};
+  APP.attendId = id;
+  $('atTitle').textContent = dn(stu.name) + '　出席記錄';
+  $('atSub').textContent = (stu.cls || '') + ' ' + id;
+  $('atFrom').value = APP.terms.t1s || '';
+  $('atTo').value = APP.today;
+  $('atTally').innerHTML = '';
+  $('atCount').textContent = '';
+  $('atList').innerHTML = '<p class="hint">載入中…</p>';
+  open_('mAttend');
+  loadAttend();
+}
+
+function loadAttend(){
+  if (!APP.attendId) return;
+  $('atList').innerHTML = '<p class="hint">載入中…</p>';
+  srv('讀取出席記錄', function(d){
+    $('atFrom').value = d.from || '';
+    $('atTo').value = d.to || '';
+    var t = d.tally || {};
+    $('atTally').innerHTML = APP.statuses.map(function(s){
+      return '<span>' + esc(s) + '　<b class="st ' + stClass(s) + '">' +
+             num(t[s] || 0) + '</b> 日</span>';
+    }).join('');
+    $('atCount').textContent = '共 ' + d.rows.length + ' 個上課日';
+
+    if (!d.rows.length) {
+      $('atList').innerHTML = '<p class="hint">這段日期範圍內沒有出席記錄。</p>';
+      return;
+    }
+    $('atList').innerHTML = d.rows.map(function(r){
+      var cls = (r.am === '缺席' || r.pm === '缺席') ? ' absent'
+              : ((r.am === '豁免' && r.pm === '豁免') ? ' exempt' : '');
+      var extra = [];
+      if (r.ltype) extra.push(esc(r.ltype));
+      if (r.days) {
+        if (r.state === 'exempt') extra.push('免交文件');
+        else if (r.state === 'done') extra.push('已交文件');
+        else extra.push('未交文件');
+      }
+      if (r.remark) extra.push(esc(r.remark));
+      return '<div class="atrow' + cls + '">' +
+        '<span class="dt">' + esc(r.date) + '<span class="wd">' + weekdayOf(r.date) + '</span></span>' +
+        '<span><span class="half">上午</span><span class="st ' + stClass(r.am) + '">' +
+          esc(r.am || '—') + '</span></span>' +
+        '<span><span class="half">下午</span><span class="st ' + stClass(r.pm) + '">' +
+          esc(r.pm || '—') + '</span></span>' +
+        '<span class="extra">' + (extra.join('　·　') || '') + '</span></div>';
+    }).join('');
+  }, function(e){
+    $('atList').innerHTML = '<p class="hint">讀取失敗：' + esc(e.message) + '</p>';
+  }).apiAttendance(APP.attendId, $('atFrom').value, $('atTo').value);
+}
+
+$('atGo').onclick = loadAttend;
+$('atFrom').onchange = function(){
+  if ($('atTo').value && $('atTo').value < this.value) $('atTo').value = this.value;
+};
+$('atReset').onclick = function(){
+  $('atFrom').value = APP.terms.t1s || '';
+  $('atTo').value = APP.today;
+  loadAttend();
+};
+
+/* ---- 編輯單筆 ---- */
+function openEdit(id, date){
+  busy(true);
+  srv('讀取記錄', function(r){
+    busy(false);
+    APP.editing = { id: r.id, date: r.date };
+    $('eSub').textContent = dn(r.name) + '　·　' + r.date + '　·　' + (r.term || '');
+    $('edAm').value = r.am; $('edPm').value = r.pm;
+    $('edType').value = r.ltype || '未分類';
+    $('edMark').value = r.mark ? '已交' : '未交';
+    $('edRemark').value = r.remark || '';
+    show('edDel', r.exists);
+    open_('mEdit');
+  }).apiGetRecord(id, date);
+}
+
+$('edSave').onclick = function(){
+  if (!APP.editing) return;
+  busy(true);
+  srv('儲存記錄', function(res){
+    busy(false); close_($('mEdit'));
+    toast(res.date + ' 已更新（' + num(res.days) + ' 日）');
+    loadDetail(APP.editing.id); refresh(true);
+  }).apiUpdateRecord({
+    studentId: APP.editing.id, date: APP.editing.date,
+    am: $('edAm').value, pm: $('edPm').value,
+    ltype: $('edType').value === '未分類' ? '' : $('edType').value,
+    mark: $('edMark').value === '已交' ? '已交' : '',
+    remark: $('edRemark').value
+  });
+};
+
+$('edDel').onclick = function(){
+  if (!APP.editing) return;
+  if (!confirm('確定刪除 ' + APP.editing.date + ' 這筆記錄？')) return;
+  busy(true);
+  srv('刪除記錄', function(res){
+    busy(false); close_($('mEdit'));
+    toast(res.date + ' 記錄已刪除');
+    loadDetail(APP.editing.id); refresh(true);
+  }).apiDeleteRecord(APP.editing.id, APP.editing.date);
+};
+
+/* ---- 新增／修改出席記錄 ---- */
+$('btnAdd').onclick = function(){
+  if (APP.gap) { openHoliday(true); return; }
+  $('rDate').value = APP.today;
+  loadRoster(APP.today);
+  open_('mRoster');
+};
+$('rDate').onchange = function(){ loadRoster(this.value); };
+
+function triHtml(i, k, cur){
+  return '<span class="rgrp"><span class="gl">' + (k === 'am' ? '上午' : '下午') + '</span>' +
+    '<span class="tri">' + APP.statuses.map(function(s){
+      return '<button type="button" data-i="' + i + '" data-k="' + k + '" data-v="' + esc(s) +
+        '" aria-pressed="' + (s === cur ? 'true' : 'false') + '">' + esc(s) + '</button>';
+    }).join('') + '</span></span>';
+}
+
+function loadRoster(date){
+  $('rList').innerHTML = '<p class="hint">載入中…</p>';
+  srv('讀取點名表', function(d){
+    var notes = [];
+    if (d.term) notes.push(d.term);
+    if (d.saved) notes.push('這天已有記錄，可直接修改');
+    if (d.weekend) notes.push('週末（如常點名會照計）');
+    if (d.holiday) notes.push('假期表內的日子');
+    if (!d.term) notes = ['這個日期不在學期範圍內'];
+    $('rSub').textContent = notes.join('　·　');
+
+    var rows = d.rows || [];
+    if (!rows.length) {
+      $('rList').innerHTML = '<p class="hint">學生名單是空的，請先在試算表貼上名單。</p>';
+      return;
+    }
+    $('rList')._rows = rows;
+    $('rList')._defaults = rows.map(function(r){ return { am: r.am, pm: r.pm }; });
+    $('rList').innerHTML = rows.map(function(r, i){
+      var flags = (r.flags || []).map(function(f){
+        return '<span class="flag ' + esc(f.cls) + '">' + esc(f.text) + '</span>';
+      }).join('');
+      return '<div class="rrow" data-row="' + i + '">' +
+        '<span class="rname"><b>' + esc(dn(r.name)) + '</b> <span class="tag-def">' +
+          esc(r.cls) + ' ' + esc(r.id) + '</span>' + flags + '</span>' +
+        triHtml(i, 'am', r.am) + triHtml(i, 'pm', r.pm) +
+        '<input type="text" data-i="' + i + '" data-k="remark" placeholder="備註" value="' +
+          esc(r.remark) + '"></div>';
+    }).join('');
+    bindRoster();
+  }, function(e){
+    $('rList').innerHTML = '<p class="hint">讀取失敗：' + esc(e.message) + '</p>';
+  }).apiRoster(date);
+}
+
+function bindRoster(){
+  var list = $('rList');
+  Array.prototype.forEach.call(list.querySelectorAll('.tri button'), function(b){
+    b.onclick = function(){
+      setCell(+b.getAttribute('data-i'), b.getAttribute('data-k'), b.getAttribute('data-v'));
+    };
+  });
+  Array.prototype.forEach.call(list.querySelectorAll('input[data-k="remark"]'), function(el){
+    el.oninput = function(){ list._rows[+el.getAttribute('data-i')].remark = el.value; };
+  });
+  (list._rows || []).forEach(function(r, i){ markRow(i); });
+}
+function setCell(i, k, v){
+  var list = $('rList');
+  if (!list._rows || !list._rows[i]) return;
+  list._rows[i][k] = v;
+  Array.prototype.forEach.call(
+    list.querySelectorAll('.tri button[data-i="' + i + '"][data-k="' + k + '"]'),
+    function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-v') === v ? 'true' : 'false'); });
+  markRow(i);
+}
+function markRow(i){
+  var r = ($('rList')._rows || [])[i];
+  if (!r) return;
+  var el = $('rList').querySelector('[data-row="' + i + '"]');
+  if (el) el.classList.toggle('leave', r.am === '缺席' || r.pm === '缺席');
+}
+Array.prototype.forEach.call(document.querySelectorAll('[data-all]'), function(b){
+  b.onclick = function(){
+    var v = b.getAttribute('data-all');
+    var half = b.getAttribute('data-half') || 'both';
+    var list = $('rList');
+    if (!list._rows || !list._rows.length) { toast('未有學生資料。', true); return; }
+    list._rows.forEach(function(r, i){
+      if (v === 'reset') {
+        setCell(i, 'am', list._defaults[i].am);
+        setCell(i, 'pm', list._defaults[i].pm);
+      } else {
+        if (half === 'am' || half === 'both') setCell(i, 'am', v);
+        if (half === 'pm' || half === 'both') setCell(i, 'pm', v);
+      }
+    });
+  };
+});
+
+$('rDelDay').onclick = function(){
+  var d = $('rDate').value;
+  if (!d) { toast('請先選擇日期。', true); return; }
+  if (!confirm('刪除 ' + d + ' 全班的出席記錄？\n\n這個動作不可復原，該日會變成沒有記錄。')) return;
+  busy(true);
+  srv('刪除當日記錄', function(res){
+    busy(false);
+    toast(res.date + ' 已刪除 ' + res.removed + ' 筆記錄');
+    loadRoster(d); refresh(true);
+  }).apiDeleteDay(d);
+};
+
+$('rSave').onclick = function(){
+  var rows = $('rList')._rows;
+  if (!rows || !rows.length) { toast('沒有可儲存的學生。', true); return; }
+  busy(true);
+  srv('儲存點名', function(res){
+    busy(false); close_($('mRoster'));
+    toast(res.date + ' 已儲存 ' + res.saved + ' 位學生' +
+          (res.linked ? '，並套用了 ' + res.linked + ' 筆預約' : ''));
+    refresh(true);
+  }).apiSaveRoster($('rDate').value, rows);
+};
+
+/* ---- 交證明文件 ---- */
+$('btnProof').onclick = function(){
+  studentOpts($('pStu'), false);
+  $('pFrom').value = APP.today; $('pTo').value = APP.today;
+  $('pMark').value = '已交';
+  syncLeaveType(); checkLeave(); loadReservations();
+  open_('mProof');
+};
+function syncLeaveType(){
+  var t = $('pLeave').value;
+  var exempt = APP.exemptTypes.indexOf(t) > -1;
+  show('pMarkWrap', !exempt);
+}
+function checkLeave(){
+  var st = $('pStatus');
+  st.className = 'status wait'; st.textContent = '檢查中…';
+  $('pSave').disabled = true;
+  srv('檢查請假日期', function(r){
+    st.textContent = r.msg;
+    st.className = 'status ' + (r.absent > 0 ? 'good' : (r.ok ? 'wait' : 'bad'));
+    $('pSave').disabled = !r.ok;
+  }, function(e){
+    st.className = 'status bad'; st.textContent = e.message; $('pSave').disabled = true;
+  }).apiCheckLeave($('pStu').value, $('pFrom').value, $('pTo').value);
+}
+$('pLeave').onchange = function(){ syncLeaveType(); };
+$('pStu').onchange = function(){ checkLeave(); loadReservations(); };
+$('pFrom').onchange = function(){
+  if ($('pTo').value < this.value) $('pTo').value = this.value;
+  checkLeave();
+};
+$('pTo').onchange = checkLeave;
+function loadReservations(){
+  $('resList').innerHTML = '<p class="hint">載入中…</p>';
+  $('resAll').checked = false;
+  srv('讀取預約', function(list){
+    if (!list.length) { $('resList').innerHTML = '<p class="hint">未有預約。</p>'; return; }
+    $('resList').innerHTML = list.map(function(r){
+      return '<div class="hitem">' +
+        '<input type="checkbox" class="rchk" value="' + esc(r.key) + '">' +
+        '<span>' + esc(r.from) + (r.to !== r.from ? ' 至 ' + esc(r.to) : '') +
+        '　<span class="tag-def">' + esc(r.ltype) +
+        (r.label ? ' · ' + esc(r.label) : '') + '</span></span>' +
+        (r.url ? '<a class="btn sm" href="' + esc(r.url) +
+                 '" target="_blank" rel="noopener">開啟</a>' : '<span></span>') +
+        '</div>';
+    }).join('');
+  }, function(e){
+    $('resList').innerHTML = '<p class="hint">讀取失敗：' + esc(e.message) + '</p>';
+  }).apiListReservations($('pStu').value);
+}
+$('resAll').onchange = function(){
+  var v = this.checked;
+  Array.prototype.forEach.call(document.querySelectorAll('.rchk'), function(c){ c.checked = v; });
+};
+$('resDel').onclick = function(){
+  var keys = checkedVals('.rchk');
+  if (!keys.length) { toast('請先選擇要刪除的預約。', true); return; }
+  if (!confirm('刪除 ' + keys.length + ' 筆預約？' + '')) return;
+  busy(true);
+  srv('刪除預約', function(res){
+    busy(false); toast('已刪除 ' + res.removed + ' 筆預約'); loadReservations();
+  }).apiDeleteReservations(keys);
+};
+
+$('pSave').onclick = function(){
+  var ltype = $('pLeave').value;
+  busy(true);
+  srv('儲存文件狀態', function(res){
+    busy(false); close_($('mProof'));
+    var parts = [];
+    if (res.days) parts.push('已套用到 ' + num(res.days) + ' 日');
+    if (res.reserved) parts.push('另有 ' + res.reserved + ' 日存為預約，到設為缺席時自動套用');
+    parts.push(res.exempt ? '公假免交文件' : '文件狀態：' + (res.mark ? '已交' : '未交'));
+    showLink('已儲存', res.ltype, '', parts.join('；') + '。');
+    refresh(true);
+  }).apiSubmitProof({
+    studentId: $('pStu').value, ltype: ltype,
+    from: $('pFrom').value, to: $('pTo').value,
+    mark: $('pMark').value === '已交' ? '已交' : ''
+  });
+};
+
+/* ---- 假期 ---- */
+$('btnHoliday').onclick = function(){ openHoliday(false); };
+$('gapOpen').onclick = function(){ openHoliday(true); };
+
+function openHoliday(gapMode){
+  APP.gapMode = !!gapMode;
+  $('hFill').style.display = gapMode ? '' : 'none';
+  $('hSub').textContent = gapMode ? '偵測到一段未填的日子' : '';
+  if (gapMode && APP.gap) {
+    $('hFrom').value = APP.gap.from; $('hTo').value = APP.gap.to; $('hNote').value = '假期';
+  } else {
+    $('hFrom').value = APP.today; $('hTo').value = APP.today; $('hNote').value = '';
+  }
+  loadHolidays();
+  open_('mHoliday');
+}
+
+function loadHolidays(){
+  $('hList').innerHTML = '<p class="hint">載入中…</p>';
+  srv('讀取假期', function(d){
+    APP.gap = d.gap; showGap();
+    var list = d.list || [];
+    if (!list.length) { $('hList').innerHTML = '<p class="hint">未有登記假期。</p>'; return; }
+    $('hList').innerHTML = list.sort(function(a,b){ return a.from < b.from ? 1 : -1; })
+      .map(function(h){
+        return '<div class="hitem nochk"><span>' + esc(h.from) +
+          (h.to !== h.from ? ' 至 ' + esc(h.to) : '') +
+          '　<span class="tag-def">' + esc(h.note) + '</span></span>' +
+          '<button class="btn sm danger" data-hdel="' + h.row + '">刪除</button></div>';
+      }).join('');
+    Array.prototype.forEach.call($('hList').querySelectorAll('[data-hdel]'), function(b){
+      b.onclick = function(){
+        if (!confirm('刪除這段假期？該段日子之後會重新計為上課日。')) return;
+        busy(true);
+        srv('刪除假期', function(){ busy(false); loadHolidays(); toast('已刪除'); })
+          .apiDeleteHoliday(b.getAttribute('data-hdel'));
+      };
+    });
+  }, function(e){
+    $('hList').innerHTML = '<p class="hint">讀取失敗：' + esc(e.message) + '</p>';
+  }).apiHolidays();
+}
+
+$('hSave').onclick = function(){
+  if (!$('hFrom').value) { toast('請選擇開始日期。', true); return; }
+  busy(true);
+  srv('加入假期', function(res){
+    busy(false);
+    toast('已加入假期 ' + res.from + (res.to !== res.from ? ' 至 ' + res.to : '') +
+          (res.removed ? '，刪走 ' + res.removed + ' 筆記錄' : '') +
+          (res.filled ? '，補填 ' + res.filled + ' 筆' : ''));
+    loadHolidays(); refresh(true);
+    if (APP.gapMode) { close_($('mHoliday')); APP.gapMode = false; }
+  }).apiAddHoliday($('hFrom').value, $('hTo').value, $('hNote').value, APP.gapMode);
+};
+
+$('hFill').onclick = function(){
+  busy(true);
+  srv('補填記錄', function(res){
+    busy(false); close_($('mHoliday'));
+    APP.gap = null; showGap();
+    toast('已補填 ' + res.filled + ' 筆記錄');
+    refresh(true);
+  }).apiFillGap();
+};
+
+/* ---- 匯出 ---- */
+$('btnExport').onclick = function(){
+  $('exTerm').value = APP.term;
+  $('exList').innerHTML = APP.summary.map(function(s){
+    return '<div class="checkrow"><input type="checkbox" class="ex" id="ex_' + esc(s.id) +
+      '" value="' + esc(s.id) + '"><label for="ex_' + esc(s.id) + '">' +
+      esc(s.cls + ' ' + s.id + ' ' + dn(s.name)) + '</label></div>';
+  }).join('');
+  $('exAll').checked = false;
+  Array.prototype.forEach.call(document.querySelectorAll('.ex'), function(c){ c.onchange = countEx; });
+  countEx();
+  open_('mExport');
+};
+$('exAll').onchange = function(){
+  var v = this.checked;
+  Array.prototype.forEach.call(document.querySelectorAll('.ex'), function(c){ c.checked = v; });
+  countEx();
+};
+function countEx(){ $('exCount').textContent = '已選 ' + checkedVals('.ex').length + ' 位'; }
+function doExport(mode){
+  var ids = checkedVals('.ex');
+  if (!ids.length) { toast('請最少選擇一位學生。', true); return; }
+  busy(true);
+  srv('匯出記錄', function(res){
+    busy(false); close_($('mExport'));
+    if (res.mode === 'sheet') {
+      showLink('已建立 Google Sheet', res.name, res.url, res.note || '');
+    } else {
+      var blob = new Blob(['\ufeff' + res.csv], { type:'text/csv;charset=utf-8;' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = res.fileName;
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      toast('CSV 已下載');
+    }
+  }).apiExport(ids, $('exTerm').value, mode);
+}
+$('exCsv').onclick   = function(){ doExport('csv'); };
+$('exSheet').onclick = function(){ doExport('sheet'); };
+
+window.onerror = function(msg, src, line){
+  busy(false);
+  showError('畫面發生錯誤：' + msg + '（第 ' + line + ' 行）');
+};
+
+boot();
+</script>
+</body>
+</html>
