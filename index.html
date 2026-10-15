@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.15-13';
+const APP_VERSION='2026.10.15-15';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -268,14 +268,14 @@ const IN_PREVIEW=(()=>{try{if(/claude|anthropic/.test(location.hostname))return 
 
 /* ===================== 分類 ===================== */
 const CATS=[
- {k:'電訊繳費',c:'#2A9DA3',kw:['china mobile','中國移動','csl','1010','smartone','數碼通','3hk','hkbn','香港寬頻','寬頻','中電','clp','港燈','hk electric','煤氣','towngas','水費','電費','管理費','保險','insurance','繳費','pps','月費']},
+ {k:'電訊繳費',c:'#2A9DA3',kw:['china mobile','中國移動','csl','1010','smartone','數碼通','3hk','hkbn','香港寬頻','寬頻','broadband','中電','clp','港燈','hk electric','煤氣','towngas','水費','電費','管理費','保險','insurance','繳費','pps','月費']},
  {k:'網購',c:'#6B8E23',kw:['網購','網上購物','hktvmall','淘寶','taobao','天貓','tmall','amazon','shopee','zalando','ebay','aliexpress','temu','shein','iherb','asos','yoho','友和','京東','jd.com','拼多多','pinduoduo','paypal','online shop','網店']},
  {k:'交通',c:'#3E7CC9',kw:['mtr','港鐵','kmb','九巴','citybus','城巴','巴士','小巴','的士','taxi','uber','渡輪','ferry','天星','shell','caltex','esso','sinopec','油站','入油','停車','parking','隧道','電車','tram','高鐵','機場快綫','車費']},
  {k:'家電電子',c:'#7D63C8',kw:['fortress','豐澤','broadway','百老匯','apple store','家電','電器','電腦','dyson','叉電','手機','耳機','數碼']},
  {k:'衣服零售',c:'#C2569B',kw:['uniqlo','h&m','zara','gu','muji','無印','nike','adidas','giordano','佐丹奴','衫','褲','鞋','裙','外套','衣服','cos','bossini','零售']},
  {k:'個人護理',c:'#D9799F',kw:['watsons','屈臣氏','mannings','萬寧','sasa','莎莎','剪髮','salon','護膚','化妝']},
  {k:'醫療健康',c:'#D0524E',kw:['診所','clinic','醫院','hospital','藥房','pharmacy','牙醫','dental','睇醫生','體檢','藥']},
- {k:'娛樂',c:'#C99A1C',kw:['netflix','spotify','disney','youtube','steam','playstation','nintendo','cinema','戲院','電影','ktv','遊戲','演唱會','門票','健身','gym']},
+ {k:'娛樂',c:'#C99A1C',kw:['netflix','spotify','disney','jockey club','賽馬會','馬會','youtube','steam','playstation','nintendo','cinema','戲院','電影','ktv','遊戲','演唱會','門票','健身','gym']},
  {k:'住屋',c:'#8C6D4F',kw:['租金','交租','rent','ikea','宜家','傢俬','裝修','日本城','japan home']},
  {k:'超市日用',c:'#3A9E6E',kw:['parknshop','百佳','wellcome','惠康','7-eleven','7-11','711','ok便利店','circle k','aeon','永旺','街市','買餸','餸','菜','肉','生果','超市','market','759','大昌','日用','紙巾','便利店']},
  {k:'餐飲',c:'#E07A3F',kw:['cafe de coral','大家樂','maxim','美心','mcdonald','麥當勞','kfc','肯德基','starbucks','星巴克','pacific coffee','吉野家','yoshinoya','譚仔','tamjai','大快活','fairwood','茶餐廳','restaurant','餐廳','cafe','coffee','咖啡','早餐','午餐','晏晝','晚餐','晚飯','宵夜','食','飯','麵','茶','飲','deliveroo','foodpanda','keeta','壽司','sushi','pizza','burger','酒樓','點心','奶茶','甜品','bakery','麵包','lunch','dinner','breakfast']},
@@ -621,29 +621,54 @@ function ingest(t,rawLine,res){
 const WALLET_RE=/(payme|八達通|octopus|alipay|支付寶|wechat|微信|tap ?& ?go|拍住賞|boc ?pay|增值|top.?up|錢包|wallet)/i;
 function parseBankMail(text){
   const t=String(text);
-  const isCard=/(信用卡交易通知|credit card transaction|card transaction|簽賬通知|信用卡.{0,12}(簽賬|交易|消費))/i.test(t);
+  const core=t.split(/\s*¦\s*/).filter(x=>!/(推廣|優惠|promotion|promo|獎賞|reward|送禮|賺取|登記|條款|terms)/i.test(x)).join(' ¦ ');
+  const isCard=/(信用卡交易通知|credit card transaction|card transaction|簽賬通知|信用卡.{0,12}(簽賬|交易|消費))/i.test(core);
   const isDD=/(直接付款授權|direct debit|edda|直接扣賬)/i.test(t);
-  if(!isCard&&!isDD)return null;
+  // 銀行付款通知：有「付款／轉賬金額」同「受款人／收款人」，即使冇寫明直接付款授權都當係由戶口付款
+  const isPay=/(付款金額|轉賬金額|轉帳金額|扣賬金額|payment amount|debit amount)/i.test(t)&&/(受款人|收款人|收款方|payee|beneficiary)/i.test(t);
+  if(!isCard&&!isDD&&!isPay)return null;
   if(/(設立|建立|成功登記|登記成功|set ?up|registration|取消|cancel|修改)/i.test(t)&&!/(已轉賬|已轉帳|已扣|debited|charged|交易金額|付款金額|轉賬金額|轉帳金額|transaction amount)/i.test(t))return{skip:true};
-  const parts=t.split(/\s*¦\s*/).filter(x=>!/(可用|信用額|額度|credit limit|available|結餘|balance|上限|最低還款|minimum payment|到期)/i.test(x));
+  const parts=core.split(/\s*¦\s*/).filter(x=>!/(可用|信用額|額度|credit limit|available|結餘|balance|上限|最低還款|minimum payment|到期)/i.test(x));
   const body=parts.join(' ¦ ');
-  const am=body.match(AMT_RE);if(!am)return{skip:true};
+  const amLine=body.split(' ¦ ').find(x=>/(金額|amount)/i.test(x)&&AMT_RE.test(x));const am=(amLine||body).match(AMT_RE);if(!am)return{skip:true};
   const amount=num(am[1]||am[2]);if(!(amount>0))return{skip:true};
-  const MP=[/(?:商戶|商號|商店|merchant)\s*(?:名稱|name)?\s*[:：]\s*([^¦,，。;]+)/i,/(?:收款人|收款方|收款戶口名稱|payee|beneficiary|receiver)\s*(?:名稱|name)?\s*[:：]?\s*([^¦,，。;]+)/i,/(?:在|於)\s*([^¦，,。\d\s][^¦，,。]*?)\s*(?:簽賬|消費|進行|交易)/,/\bat\s+([A-Z0-9*][^¦,;]*?)(?:\s+on\s|\s+for\s|\s*[¦,;]|\.\s|$)/i,/(?:轉賬至|轉帳至|轉賬予|轉帳予|付款予|付款至|轉賬給|轉帳給|to)\s+([^¦,，。;]+?)(?:\s+on\s|[¦,，。;]|$)/i];
+  const MP=[/(?:商戶|商號|商店|merchant)\s*(?:名稱|name)?\s*[:：]\s*([^¦,，。;]+)/i,/(?:受款人|收款人|收款方|收款戶口名稱|payee|beneficiary|receiver)\s*(?:名稱|name)?\s*[:：]?\s*([^¦,，。;]+)/i,/(?:在|於)\s*([^¦，,。\d\s][^¦，,。]*?)\s*(?:簽賬|消費|進行|交易)/,/\bat\s+([A-Z0-9*][^¦,;]*?)(?:\s+on\s|\s+for\s|\s*[¦,;]|\.\s|$)/i,/(?:轉賬至|轉帳至|轉賬予|轉帳予|付款予|付款至|轉賬給|轉帳給|to)\s+([^¦,，。;]+?)(?:\s+on\s|[¦,，。;]|$)/i];
   let merchant='';for(const p of MP){const m=body.match(p);if(m&&m[1].trim()&&!/^(HKD|HK\$|\$|港元)/i.test(m[1].trim())){merchant=m[1].trim();break}}
   merchant=merchant.replace(/(?:HKD|HK\$|\$|港元|港幣)\s*[\d,.]+/ig,'').replace(/\s+on\s+\d.*$/i,'').trim().slice(0,48);
   const l4=body.match(/(?:尾號|末四位|ending(?: in| with)?|card(?: number| no\.?)?(?: ending)?)[^\d]{0,14}(\d{4})/i)||body.match(/[*xX•]{2,}[\s-]?(\d{4})/);
   let type=/(退款|refund|reversal|credit adjustment|退回)/i.test(body)?'refund':'expense';
   let channel;
-  if(isDD&&!isCard){channel='autopay';if(WALLET_RE.test(merchant||body))type='transfer';if(!merchant)merchant='直接付款授權'}
+  if(isDD||(isPay&&!isCard)){channel=isDD||/(戶口|account)/i.test(body)?'autopay':'bank';if(WALLET_RE.test(merchant||body))type='transfer';if(!merchant)merchant=isDD?'直接付款授權':'銀行付款'}
   else{let c=l4?matchCard(l4[1]):matchCard(body);if(!c&&l4)c=ensureCard('尾號 '+l4[1],'credit'),c.keywords=[l4[1]];channel=c?c.id:'credit';
     if(c&&c.collect===false)return{skip:true};
     if(/payme|增值|top.?up|充值/i.test(merchant))type='transfer';if(!merchant)merchant='信用卡簽賬'}
   return{amount,merchant,channel,type};
 }
+// iOS 27「收到通知」自動化：銀包（Apple Pay／八達通）等通知通常冇「已付款」字眼，只有商戶同金額
+function parseWalletNotif(text){
+  const t=String(text).replace(/\s+/g,' ');
+  if(/(OTP|驗證碼|一次性|密碼|passcode)/i.test(t))return null;
+  const am=t.match(AMT_RE);if(!am)return null;const amount=num(am[1]||am[2]);if(!(amount>0))return null;
+  if(/(結餘|餘額|balance)/i.test(t)&&!/(扣除|支付|付款|消費|spent|paid)/i.test(t))return null;
+  let type='expense';
+  if(/(退款|refund|退回)/i.test(t))type='refund';
+  else if(/(增值|top.?up|充值|加值|add money|自動增值|aavs)/i.test(t))type='transfer';
+  else if(IN_RE.test(t)&&!OUT_RE.test(t))type='income';
+  const isOcto=/(八達通|octopus)/i.test(t);
+  let c=matchCard(t);if(!c&&isOcto)c=S.cards.find(x=>x.type==='octopus')||ensureCard('八達通','octopus');
+  if(c&&c.collect===false)return null;
+  if(c&&c.type==='octopus'&&!S.channels.octopus)return null;
+  const app=PAY_APP.find(p=>p[0].test(t));
+  let m=t.replace(am[0],' ').replace(/(銀包|wallet|apple pay|八達通|octopus|通知|notification|現在|now|剛剛|\d+\s*(分鐘|小時|秒)前|\d{1,2}:\d{2}|已扣除|扣除|已支付|支付|付款|消費|交易|於|在|向)/gi,' ');
+  if(c)for(const k of [c.name,...(c.keywords||[])])if(k&&k.length>=2)m=m.replace(new RegExp(escRe(k),'ig'),' ');
+  m=m.split(/[¦|，,。:：]/).map(x=>x.trim()).filter(x=>x&&/[A-Za-z㐀-鿿]{2,}/.test(x)&&!/^(HK|HKD)$/i.test(x)).sort((a,b)=>b.length-a.length)[0]||'';
+  m=m.replace(/\s+/g,' ').trim().slice(0,40);
+  const channel=c?c.id:app?notifChannel(app[1]):'other';
+  return{type,amount,merchant:m||(c?c.name:app?app[2]:'通知付款'),channel};
+}
 function producedBy(line){const hit=x=>x&&(x===line||line.includes(x));return S.txns.concat(S.trash.filter(e=>e.kind==='txn').map(e=>e.item)).some(t=>(t.raw||[]).some(hit))||S.incomeEntries.some(e=>(e.raw||[]).some(hit))}
 function importText(text,opts={}){
-  const res={added:0,merged:0,review:0,skipped:0,dupe:0,income:0,src:{pay:0,sms:0,mail:0}};
+  const res={added:0,merged:0,review:0,skipped:0,dupe:0,income:0,src:{pay:0,sms:0,mail:0,ocr:0}};
   S.lastSeen=S.lastSeen||{};
   for(const r of parseInbox(text)){
     if(res.src[r.kind]!=null&&!r.pasted){res.src[r.kind]++;S.lastSeen[r.kind]=fmtLocal(new Date())}
@@ -658,7 +683,13 @@ function importText(text,opts={}){
       if(src==='mail'){const bk=parseBankMail(r.parts.slice(2).join(' ¦ '));
         if(bk){if(bk.skip){res.skipped++;continue}S.imported[h]=1;ingest({ts,amount:bk.amount,merchant:bk.merchant,channel:bk.channel,type:bk.type,source:'mail'},r.line,res);continue}}
       const items=parseNotifs(r.parts.slice(2).join(' ¦ '),src==='mail');
-      if(!items.length){res.skipped++;continue}
+      if(!items.length){
+        const w=src==='notif'?parseWalletNotif(r.parts.slice(2).join(' ¦ ')):null;
+        if(!w){res.skipped++;continue}
+        S.imported[h]=1;
+        if(w.type==='income')addIncomeAuto({ts,amount:w.amount,name:w.merchant,src,raw:r.line},res);
+        else ingest({ts,amount:w.amount,merchant:w.merchant,channel:w.channel,type:w.type,source:'notif'},r.line,res);
+        continue}
       for(const it of items){
         const k='n'+hash(it.key);if(S.imported[k]){res.dupe++;continue}S.imported[k]=1;
         S.imported[h]=1;
@@ -840,7 +871,7 @@ async function syncPull(manual){
     else if(res.last<(S.inboxSince||0)){S.inboxSince=res.last;save()}
     net.state='ok';SYNC.lastOk=fmtSec(new Date());storeSync();
     if(manual){hideBusy();const got=r&&(r.added||r.income||r.merged);const sc=(r&&r.src)||{pay:0,sms:0,mail:0};
-      toast(`試算表新資料：Apple Pay ${sc.pay} · 短訊 ${sc.sms} · 電郵 ${sc.mail}｜`+(got?`新增 ${r.added} 筆支出${r.income?` · ${r.income} 筆收入`:''}${r.merged?` · 合併 ${r.merged} 筆`:''}${r.review?` · ${r.review} 組要核實`:''}`:'冇新記錄')+mailNote)}
+      toast(`試算表新資料：Apple Pay ${sc.pay} · 通知 ${sc.ocr||0} · 短訊 ${sc.sms} · 電郵 ${sc.mail}｜`+(got?`新增 ${r.added} 筆支出${r.income?` · ${r.income} 筆收入`:''}${r.merged?` · 合併 ${r.merged} 筆`:''}${r.review?` · ${r.review} 組要核實`:''}`:'冇新記錄')+mailNote)}
     else if(r&&(r.added||r.merged||r.income))toast(`收到 ${r.added+r.merged+r.income} 筆新記錄`);
   }catch(e){net.state='err';net.err=e.message;if(manual){hideBusy();toast('同步失敗：'+e.message)}}
   pulling=false;softRender();
@@ -1073,7 +1104,7 @@ function resolveReview(id,same){
 const TYPE_CARD={credit:'信用卡',debit:'扣賬卡',octopus:'八達通',ewallet:'電子錢包'};
 function renderCards(){
   const m=curMonth();
-  const ch=[['applepay','Apple Pay（Wallet 交易）','每次拍卡由捷徑記低卡名、商戶、金額'],['sms','銀行短訊','捷徑轉交短訊，app 喺本機解析'],['octopus','八達通','Wallet 入面嘅八達通交易'],['mail','電郵通知（PayMe／BoC Pay／轉數快／銀行交易通知）','Gmail 每 5 分鐘自動檢查，撳右上角「更新」即時檢查；只讀'],['cash','現金快速記帳','總覽頁嘅一句話記帳']];
+  const ch=[['applepay','Apple Pay（Wallet 交易）','每次拍卡由捷徑記低卡名、商戶、金額'],['sms','銀行短訊','捷徑轉交短訊，app 喺本機解析'],['octopus','八達通','Wallet 入面嘅八達通交易'],['notif','App 通知（iOS 27：銀包、八達通、PayMe 等）','iPhone 收到付款通知時由捷徑轉交，只保留有金額嘅內容'],['mail','電郵通知（PayMe／BoC Pay／轉數快／銀行交易通知）','Gmail 每 5 分鐘自動檢查，撳右上角「更新」即時檢查；只讀'],['cash','現金快速記帳','總覽頁嘅一句話記帳']];
   $('#tab-cards').innerHTML=`
   <div class="page-head"><div><div class="eyebrow">收邊啲、點計回贈，由你揀。</div><h1>卡與渠道</h1></div></div>
   <div class="card" id="gs-card"><div class="card-head"><h3>Google 試算表</h3>${CONN?`<span class="badge">${net.state==='err'?'連線失敗':'已連接'}</span>`:''}</div>
@@ -1088,7 +1119,7 @@ function renderCards(){
       <div class="err" id="gs-err" hidden></div>
       <button class="btn" type="button" id="gs-go">連接</button>`}
   </div>
-  <div class="card"><h3>收集渠道</h3><div class="list">${ch.map(([k,l,d])=>`<div class="li"><span class="grow"><span class="t" style="display:block">${l}</span><span class="m">${d}${({applepay:'pay',sms:'sms',mail:'mail'})[k]?` · 最近收到：${(S.lastSeen||{})[({applepay:'pay',sms:'sms',mail:'mail'})[k]]?(x=>`${+x.slice(5,7)}/${+x.slice(8,10)} ${x.slice(11,16)}`)(S.lastSeen[({applepay:'pay',sms:'sms',mail:'mail'})[k]]):'<b style="color:var(--red)">從未收到</b>'}`:''}</span></span><label class="switch"><input type="checkbox" data-ch="${k}" ${S.channels[k]?'checked':''} aria-label="${l}"><span></span></label></div>`).join('')}</div>
+  <div class="card"><h3>收集渠道</h3><div class="list">${ch.map(([k,l,d])=>`<div class="li"><span class="grow"><span class="t" style="display:block">${l}</span><span class="m">${d}${({applepay:'pay',sms:'sms',mail:'mail',notif:'ocr'})[k]?` · 最近收到：${(S.lastSeen||{})[({applepay:'pay',sms:'sms',mail:'mail',notif:'ocr'})[k]]?(x=>`${+x.slice(5,7)}/${+x.slice(8,10)} ${x.slice(11,16)}`)(S.lastSeen[({applepay:'pay',sms:'sms',mail:'mail',notif:'ocr'})[k]]):'<b style="color:var(--red)">從未收到</b>'}`:''}</span></span><label class="switch"><input type="checkbox" data-ch="${k}" ${S.channels[k]?'checked':''} aria-label="${l}"><span></span></label></div>`).join('')}</div>
     <label class="field"><span>Apple Pay 同短訊合併時間範圍</span><select id="merge-h">${[2,6,12,24,48].map(h=>`<option value="${h}" ${S.settings.mergeHours===h?'selected':''}>${h} 小時內同金額就當係同一筆候選</option>`).join('')}</select></label>
   </div>
   <div class="card"><div class="card-head"><h3>我的卡（本期回贈）</h3><button class="btn sm ghost" type="button" data-act="add-card">＋ 新增卡</button></div>
@@ -1114,6 +1145,14 @@ function renderCards(){
       <ol class="steps" start="4"><li>同樣加<b>「取得 URL 內容」</b>，設定同 ① 一樣（POST、JSON、token、line）。換行會由試算表自動處理。</li>
       <li>驗證碼短訊會自動略過；轉賬、還卡數會記低但唔計入支出。</li></ol>
       <button class="btn sm ghost" type="button" data-act="copy" data-src="tpl-sms">複製格式</button></details>
+    <details><summary>App 通知（iOS 27：銀包／八達通／PayMe）</summary><ol class="steps">
+      <li>「捷徑」→「自動化」→ ＋ → 揀<b>「通知」</b>（收到 App 通知時）→ App 揀<b>「銀包」</b>。想加 PayMe、BoC Pay 等，就逐個 app 整多個自動化。</li>
+      <li>揀「立即執行」，關閉「執行時通知」→「新增空白自動化操作」。</li>
+      <li>加<b>「文字」</b>，內容照打，[捷徑輸入] 唔使揀類型：</li></ol>
+      <div class="code" id="tpl-notif">notif || [目前日期] || [捷徑輸入]</div>
+      <ol class="steps" start="4"><li>「目前日期」揀 ISO 8601、包括時間；再加「取得 URL 內容」，設定同 Apple Pay 一樣（POST、JSON、token、line）。</li>
+      <li>試算表只會保留有金額嗰幾行，冇金額嘅通知唔會寫入。同一筆交易如果電郵都有，會自動合併。</li></ol>
+      <button class="btn sm ghost" type="button" data-act="copy" data-src="tpl-notif">複製格式</button></details>
     <details><summary>③ 電郵通知（全自動，Gmail）</summary><ol class="steps">
       <li>喺 Apps Script 撳齒輪「專案設定」，剔<b>「在編輯器中顯示『appsscript.json』資訊清單檔案」</b>。</li>
       <li>返去編輯器，打開 <b>appsscript.json</b>，用我俾你嘅版本成個取代；再貼上新版 <b>Code.gs</b>（保留你原本嘅 TOKEN）。</li>
