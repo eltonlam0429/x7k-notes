@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.15-16';
+const APP_VERSION='2026.10.15-17';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1515,7 +1515,7 @@ function openCard(id){
       <label class="field"><span>辨認字眼（用逗號分隔：卡尾 4 位、Wallet 入面張卡嘅名）</span><input id="c-kw" value="${esc((d.keywords||[]).join(', '))}" placeholder="例如：8821, HSBC Red"></label>
       ${d.type==='octopus'?(()=>{const A=octoDefaults(d);return`<h3 style="margin-top:6px">八達通餘額計算</h3>
       <div class="small muted">iPhone 收到「新餘額」通知時，會同上次餘額比較：減少 ＝ 支出，增加 ＝ 增值。</div>
-      <div class="row2"><label class="field"><span>自動增值</span><select id="o-on"><option value="1" ${A.on?'selected':''}>有</option><option value="0" ${A.on?'':'selected'}>冇</option></select></label><label class="field"><span>每次自動增值金額</span><input id="o-amt" inputmode="decimal" value="${esc(A.amt)}"></label></div>
+      <div class="row2"><label class="field"><span>自動增值</span><select id="o-on"><option value="1" ${A.on?'selected':''}>有</option><option value="0" ${A.on?'':'selected'}>冇</option></select></label><label class="field"><span>每次自動增值金額（HK$）</span><input id="o-amt" inputmode="decimal" value="${esc(A.amt)}" ${A.on?'':'disabled'}></label></div>
       <div class="row2"><label class="field"><span>八達通消費預設分類</span><select id="o-cat">${catOptions(A.cat)}</select></label><label class="field"><span>目前餘額（可修正起點）</span><input id="o-bal" inputmode="decimal" value="${d.octoBal?esc(d.octoBal.bal):''}" placeholder="等第一個通知"></label></div>`})():''}
       <h3 style="margin-top:6px">回贈</h3>
       <label class="field"><span>每月回贈重置日（例如月結單日之後嗰日）</span><select id="c-reset">${Array.from({length:31},(_,i)=>`<option value="${i+1}" ${(+R.resetDay||1)===i+1?'selected':''}>每月 ${i+1} 號</option>`).join('')}</select></label>
@@ -1538,6 +1538,8 @@ function openCard(id){
           if(R.mode==='tier')R.tiers.forEach((t,i)=>{const l=val(`[data-tl="${i}"]`);t.limit=l===''?'':num(l);t.pct=num(val(`[data-tp="${i}"]`))||0});
           else if(R.mode==='split'){R.basePct=num(val('#c-base'))||0;R.extraPct=num(val('#c-extra'))||0;const c=val('#c-cap');R.extraCap=c===''?'':num(c)}
           else{R.basePct=num(val('#c-base'))||0;R.catRules.forEach((r,i)=>{r.pct=num(val(`[data-rp="${i}"]`))||0;const c=val(`[data-rcap="${i}"]`);r.cap=c===''?'':num(c)})}};
+        $('#c-type').onchange=()=>{grab();if(d.type==='octopus')octoDefaults(d);draw()};
+        const oon=$('#o-on');if(oon)oon.onchange=()=>{$('#o-amt').disabled=oon.value!=='1'};
         document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{grab();const was=R.mode;R.mode=b.dataset.m;if(was==='tier'&&R.mode!=='tier'&&!R.basePct)R.basePct=(R.tiers[R.tiers.length-1]||{}).pct||0;if(R.mode==='cat'&&!R.catRules.length)R.catRules.push({cats:[],pct:0,cap:''});draw()});
         document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{grab();R.tiers.splice(+b.dataset.rm,1);draw()});
         const at=$('#c-addtier');if(at)at.onclick=()=>{grab();R.tiers.push({limit:'',pct:0});draw()};
