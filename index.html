@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.15-15';
+const APP_VERSION='2026.10.15-16';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -369,7 +369,7 @@ function migrate(s){
   if(s.channels&&s.channels.mail===undefined)s.channels.mail=true;
   (s.bills||[]).forEach(b=>migrateSched(b,true));
   (s.incomeTemplates||[]).forEach(t=>migrateSched(t,false));
-  (s.cards||[]).forEach(c=>{if(!c.rebate)c.rebate={mode:'tier',tiers:[{limit:'',pct:0}]};const R=c.rebate;if(!R.tiers)R.tiers=[{limit:'',pct:0}];if(!R.extraCats)R.extraCats=[];if(!R.catRules)R.catRules=[];if(R.basePct==null)R.basePct=0;if(!R.resetDay)R.resetDay=1});
+  (s.cards||[]).forEach(c=>{if(!c.rebate)c.rebate={mode:'tier',tiers:[{limit:'',pct:0}]};const R=c.rebate;if(!R.tiers)R.tiers=[{limit:'',pct:0}];if(!R.extraCats)R.extraCats=[];if(!R.catRules)R.catRules=[];if(R.basePct==null)R.basePct=0;if(!R.resetDay)R.resetDay=1;if(c.type==='octopus')octoDefaults(c)});
   return s;
 }
 function hydrate(o){return migrate(Object.assign(blankState(),o))}
@@ -532,6 +532,24 @@ function recToTxn(r){
   const merchant=p.type==='income'?`${appName}${p.merchant?' · 由 '+p.merchant:' 收款'}`:(p.merchant||(p.type==='transfer'?'轉賬 / 還款':'未知商戶'));
   return{t:{ts:parseTime(r.parts[1])||fmtLocal(new Date()),amount:p.amount,merchant,channel:app&&!c?app:(c?c.id:'cash'),type:p.type,source:'sms'}};
 }
+const GENERIC_CH=new Set(['credit','other','cash','']);
+const chCompatible=(a,b)=>a===b||GENERIC_CH.has(a||'')||GENERIC_CH.has(b||'');
+const GENERIC_MER=/^(通知付款|信用卡簽賬|銀行付款|錢包|未知商戶|apple pay)$/i;
+// 由通知／電郵內容判斷付款渠道：卡尾號 → 指定卡；轉數快／轉賬 → 轉賬；信用卡字眼 → 信用卡
+function detectChannel(text,src){
+  const t=String(text);
+  if(/(八達通|octopus)/i.test(t)&&!/(增值|top.?up)/i.test(t)){const oc=S.cards.find(x=>x.type==='octopus');if(oc)return oc.id}
+  const l4=t.match(/(?:尾號|結尾|末四位|ending(?: in| with)?|card ending|卡號)[^\d]{0,12}(\d{4})/i)||t.match(/[*xX•]{2,}[\s-]?(\d{4})(?!\d)/);
+  if(l4){const c=matchCard(l4[1]);if(c)return c.id}
+  const c2=matchCard(t);if(c2)return c2.id;
+  if(/(轉數快|\bfps\b)/i.test(t))return/boc ?pay/i.test(t)?'bocpay':/payme/i.test(t)?'payme':'fps';
+  if(/(轉出|轉入|轉賬|轉帳|transfer)/i.test(t))return'bank';
+  const app=PAY_APP.find(p=>p[0].test(t));
+  if(app&&!/(信用卡|credit card)/i.test(t))return notifChannel(app[1]);
+  if(l4){const c=ensureCard('尾號 '+l4[1],'credit');c.keywords=[l4[1]];return c.id}
+  if(/(信用卡|credit card|visa|master ?card|unionpay|銀聯|amex|簽賬)/i.test(t))return'credit';
+  return src==='notif'?'credit':'other';
+}
 function findMatch(t){
   const W=S.settings.mergeHours;let best=null,bs=0,repeat=null;
   for(const c of S.txns){
@@ -540,7 +558,9 @@ function findMatch(t){
     const srcs=c.sources||[c.source];const sim=merchantSim(c.merchant,t.merchant);
     if(srcs.includes(t.source)){if(sim>=0.6&&dt<=0.5)repeat=c;continue}
     const cardM=c.channel&&c.channel===t.channel&&c.channel!=='cash';
-    const score=sim*2+(cardM?1:0)+(1-dt/W)*0.8;
+    // 唔同來源、同金額：時間好近、商戶相似或者渠道對得上，就當同一筆
+    let score=sim*2+(cardM?1:0)+(1-dt/W)*0.8;
+    if(dt<=2||sim>=0.5||(chCompatible(c.channel,t.channel)&&dt<=6))score=Math.max(score,1.6);
     if(score>bs){bs=score;best=c}
   }
   if(best&&bs>=1.6)return{merge:best};
@@ -552,7 +572,7 @@ function findMatch(t){
 const AMT_RE=/(?:HK\$|HKD|\$|港幣|港元)\s*([\d,]+(?:\.\d{1,2})?)|([\d,]+(?:\.\d{1,2})?)\s*(?:HKD|港元|港幣|蚊)/i;
 const IN_RE=/(收到|已收|向你付款|向你轉|轉賬給你|轉帳給你|轉賬予你|轉帳予你|付款給你|付款予你|俾咗你|畀咗你|received|sent you|paid you|has sent you|已存入|存入你|入賬|轉入|已收款|收到一筆款項|credited|收款(?!人|方))/i;
 const OUT_RE=/(你已向|已向(?!你)|你向(?!你)|付款至|付款予(?!你)|轉賬至|轉帳至|轉賬到|轉帳到|you paid|you sent|paid to(?! you)|sent to(?! you)|已支付|支付了|付款成功|已付款|轉賬成功|轉帳成功|成功轉賬|成功轉帳|成功付款|payment successful|transfer successful|轉出|轉帳給(?!你)|轉賬給(?!你)|付款給(?!你)|debited|扣賬|扣款)/i;
-const PAY_APP=[[/payme/i,'payme','PayMe'],[/boc ?pay|中銀/i,'bocpay','BoC Pay'],[/轉數快|\bfps\b/i,'fps','轉數快'],[/alipay|支付寶/i,'alipay','AlipayHK'],[/wechat|微信/i,'wechat','WeChat Pay'],[/八達通|octopus/i,'octopus','八達通'],[/tap ?& ?go|拍住賞/i,'other','Tap & Go']];
+const PAY_APP=[[/payme/i,'payme','PayMe'],[/boc ?pay/i,'bocpay','BoC Pay'],[/轉數快|\bfps\b/i,'fps','轉數快'],[/alipay|支付寶/i,'alipay','AlipayHK'],[/wechat|微信/i,'wechat','WeChat Pay'],[/八達通|octopus/i,'octopus','八達通'],[/tap ?& ?go|拍住賞/i,'other','Tap & Go']];
 const normNotif=s=>String(s).replace(/\d+\s*(分鐘|小時|秒|mins?|hrs?|h)\s*(前|ago)?|現在|now|剛剛|昨天|\d{1,2}:\d{2}/gi,'').replace(/\s+/g,'');
 function dirOf(s){const i=IN_RE.test(s),o=OUT_RE.test(s);if(i&&!o)return'income';if(o&&!i)return'expense';if(i&&o)return/(你已向|you paid|you sent|轉賬成功|轉帳成功|成功轉賬|成功轉帳|付款成功|成功付款|收款人|payee)/i.test(s)?'expense':'income';return null}
 function parseNotifs(text,useWhole){
@@ -608,7 +628,8 @@ function ingest(t,rawLine,res){
     const c=fm.merge;c.sources=[...new Set([...(c.sources||[c.source]),t.source])];c.raw=[...(c.raw||[]),rawLine];
     if(t.source==='applepay'&&t.merchant)c.merchant=t.merchant;
     if(t.source==='applepay')c.ts=t.ts;
-    if(!c.channel||c.channel==='cash'||c.channel==='other')c.channel=t.channel;
+    if(GENERIC_CH.has(c.channel||'')&&!GENERIC_CH.has(t.channel||''))c.channel=t.channel;
+    if(GENERIC_MER.test(c.merchant||'')&&t.merchant&&!GENERIC_MER.test(t.merchant))c.merchant=t.merchant;
     if(c.status!=='confirmed')c.status=c.category==='其他'?'pending':'confirmed';
     res.merged++;
   }else{
@@ -645,6 +666,32 @@ function parseBankMail(text){
   return{amount,merchant,channel,type};
 }
 // iOS 27「收到通知」自動化：銀包（Apple Pay／八達通）等通知通常冇「已付款」字眼，只有商戶同金額
+// 八達通餘額通知：「你的新餘額為HK$149.50」→ 同上次餘額比較計出支出／增值
+function octoDefaults(c){c.aavs=Object.assign({on:true,amt:500,cat:'交通'},c.aavs||{});return c.aavs}
+function handleOctoBalance(text,ts,line,res){
+  const t=String(text);
+  if(!/(八達通|octopus)/i.test(t)||!/(新餘額|餘額為|結餘為|餘額|new balance|balance)/i.test(t))return false;
+  if(/(扣除|支付|付款|消費|spent|paid|增值|top.?up)/i.test(t)&&!/新餘額|new balance/i.test(t))return false;
+  const m=t.match(/(?:餘額|結餘|balance)[^\d-]{0,12}(-)?\s*(?:HK\$|HKD|\$)?\s*(-)?([\d,]+(?:\.\d{1,2})?)/i);if(!m)return false;
+  const bal=(m[1]||m[2]?-1:1)*num(m[3]);
+  const oc=S.cards.find(x=>x.type==='octopus')||ensureCard('八達通','octopus');
+  if(oc.collect===false||!S.channels.octopus)return true;
+  const A=octoDefaults(oc);const prev=oc.octoBal;oc.octoBal={bal,ts};
+  if(!prev||prev.ts>ts){res.octo=(res.octo||0)+1;return true}
+  const mk=(type,amount,merchant,note,cat)=>{if(!(amount>0.004))return;
+    // 如果已經有同金額嘅八達通記錄（例如有商戶嘅通知），就唔再重複記
+    if(type==='expense'&&S.txns.some(x=>x.channel===oc.id&&x.type==='expense'&&Math.abs(x.amount-amount)<0.005&&Math.abs(toDate(x.ts)-toDate(ts))<=36e5))return;
+    S.txns.push({id:uid(),ts,amount:r2(amount),merchant,category:cat||categorize(merchant),channel:oc.id,type,status:'confirmed',source:'notif',sources:['notif'],raw:[line],note,catChecked:true});res.added++};
+  const diff=r2(prev.bal-bal);
+  if(diff>0)mk('expense',diff,'八達通消費',`由餘額計算：$${prev.bal} → $${bal}`,A.cat);
+  else if(diff<0){const inc=-diff;
+    if(A.on&&+A.amt>0&&prev.bal<=50&&inc<=+A.amt+0.004){
+      mk('transfer',+A.amt,'八達通自動增值',`由餘額計算：$${prev.bal} → $${bal}，推算自動增值 $${A.amt}`);
+      mk('expense',+A.amt-inc,'八達通消費',`由餘額計算：自動增值 $${A.amt} 後扣除 $${r2(+A.amt-inc)}`,A.cat);
+    }else mk('transfer',inc,'八達通增值',`由餘額計算：$${prev.bal} → $${bal}`);
+  }
+  return true;
+}
 function parseWalletNotif(text){
   const t=String(text).replace(/\s+/g,' ');
   if(/(OTP|驗證碼|一次性|密碼|passcode)/i.test(t))return null;
@@ -659,11 +706,11 @@ function parseWalletNotif(text){
   if(c&&c.collect===false)return null;
   if(c&&c.type==='octopus'&&!S.channels.octopus)return null;
   const app=PAY_APP.find(p=>p[0].test(t));
-  let m=t.replace(am[0],' ').replace(/(銀包|wallet|apple pay|八達通|octopus|通知|notification|現在|now|剛剛|\d+\s*(分鐘|小時|秒)前|\d{1,2}:\d{2}|已扣除|扣除|已支付|支付|付款|消費|交易|於|在|向)/gi,' ');
+  let m=t.replace(am[0],' ').replace(/(信用卡|credit card|簽賬|hsbc|滙豐|匯豐|中銀香港|中銀|boc|恒生|hang seng|渣打|standard chartered|花旗|citi|dbs|星展|東亞|bea|大新|dah sing|安信|wewa|mox|za bank|銀包|wallet|apple pay|八達通|octopus|通知|notification|現在|now|剛剛|\d+\s*(分鐘|小時|秒)前|\d{1,2}:\d{2}|已扣除|扣除|已支付|支付|付款|消費|交易|於|在|向)/gi,' ');
   if(c)for(const k of [c.name,...(c.keywords||[])])if(k&&k.length>=2)m=m.replace(new RegExp(escRe(k),'ig'),' ');
   m=m.split(/[¦|，,。:：]/).map(x=>x.trim()).filter(x=>x&&/[A-Za-z㐀-鿿]{2,}/.test(x)&&!/^(HK|HKD)$/i.test(x)).sort((a,b)=>b.length-a.length)[0]||'';
   m=m.replace(/\s+/g,' ').trim().slice(0,40);
-  const channel=c?c.id:app?notifChannel(app[1]):'other';
+  const channel=c?c.id:detectChannel(t,'notif');
   return{type,amount,merchant:m||(c?c.name:app?app[2]:'通知付款'),channel};
 }
 function producedBy(line){const hit=x=>x&&(x===line||line.includes(x));return S.txns.concat(S.trash.filter(e=>e.kind==='txn').map(e=>e.item)).some(t=>(t.raw||[]).some(hit))||S.incomeEntries.some(e=>(e.raw||[]).some(hit))}
@@ -683,6 +730,7 @@ function importText(text,opts={}){
       if(src==='mail'){const bk=parseBankMail(r.parts.slice(2).join(' ¦ '));
         if(bk){if(bk.skip){res.skipped++;continue}S.imported[h]=1;ingest({ts,amount:bk.amount,merchant:bk.merchant,channel:bk.channel,type:bk.type,source:'mail'},r.line,res);continue}}
       const items=parseNotifs(r.parts.slice(2).join(' ¦ '),src==='mail');
+      if(src==='notif'&&handleOctoBalance(r.parts.slice(2).join(' ¦ '),ts,r.line,res)){S.imported[h]=1;continue}
       if(!items.length){
         const w=src==='notif'?parseWalletNotif(r.parts.slice(2).join(' ¦ ')):null;
         if(!w){res.skipped++;continue}
@@ -694,7 +742,7 @@ function importText(text,opts={}){
         const k='n'+hash(it.key);if(S.imported[k]){res.dupe++;continue}S.imported[k]=1;
         S.imported[h]=1;
         if(it.type==='income')addIncomeAuto({ts,amount:it.amount,name:`${it.appName}${it.party?' · 由 '+it.party:' 收款'}`,src,raw:it.text},res);
-        else ingest({ts,amount:it.amount,merchant:it.party?`${it.appName} · ${it.party}`:it.appName,channel:it.app==='other'&&it.card?it.card:notifChannel(it.app),type:it.type,source:src,note:it.discount?`已扣除優惠券／折扣 $${it.discount}`:''},it.text,res);
+        else ingest({ts,amount:it.amount,merchant:it.party?`${it.appName} · ${it.party}`:it.appName,channel:it.card||(it.app!=='other'?notifChannel(it.app):detectChannel(it.text,src)),type:it.type,source:src,note:it.discount?`已扣除優惠券／折扣 $${it.discount}`:''},it.text,res);
       }
       continue;
     }
@@ -1081,6 +1129,8 @@ function renderRecords(){
   <div class="page-head"><div><div class="eyebrow">逐筆睇清楚，錯咗即刻改。</div><h1>記錄與核實</h1></div><div class="actions" style="flex:none"><button class="btn sm line" type="button" data-act="trash">垃圾筒${S.trash.length?`（${S.trash.length}）`:''}</button><button class="btn sm" type="button" data-act="new-tx">＋ 新增支出</button></div></div>
   ${open.length||pend.length?`<div class="card pending-zone"><div class="card-head"><h3>待核實</h3><span class="small muted">${open.length} 組可能重複 · ${pend.length} 筆待確認</span></div>
     <div class="small muted">呢度嘅記錄未計入下面嘅已核實記錄。撳入去可以改或刪除，確認之後就會移落去。</div>
+    <button class="btn" type="button" data-act="one-click">一鍵核實</button>
+    <div class="small faint">一鍵核實：唔同來源（例如通知同電郵）收到同一金額，第二次當重複，合併做一筆唔再計支出；同一來源重複出現嘅會留低俾你決定；其餘待確認記錄全部確認。</div>
     ${open.map(r=>{const a=S.txns.find(t=>t.id===r.a),b=S.txns.find(t=>t.id===r.b);const mins=Math.round(Math.abs(toDate(a.ts)-toDate(b.ts))/6e4);return`<div class="review"><div class="q">${r.kind==='repeat'?`同一商戶、同一金額，相隔 ${mins} 分鐘。係一筆定兩筆？`:`${SRC_L[a.source]||'通知'} 同 ${SRC_L[b.source]||'通知'} 金額一樣（相隔 ${mins>=60?Math.round(mins/6)/10+' 小時':mins+' 分鐘'}），可能係同一筆。`}</div><div class="list">${tag(a)}${rvRow(a)}${tag(b)}${rvRow(b)}</div><label class="field"><span>分類（自動判斷，可以改）</span><select data-act="rev-cat" data-id="${r.id}">${catOptions(a.category)}</select></label><div class="acts"><button class="btn sm" type="button" data-act="rev-same" data-id="${r.id}">同一筆，合併</button><button class="btn sm ghost" type="button" data-act="rev-diff" data-id="${r.id}">${r.kind==='repeat'?'真係兩筆（多次）':'唔同交易，保留兩筆'}</button></div><div class="small faint">「合併」會保留上面嗰筆，下面嗰筆會移去垃圾筒。</div></div>`}).join('')}
     ${pend.length?`<div class="list">${pend.slice(0,30).map(txRow).join('')}</div><div class="actions"><button class="btn ghost" type="button" data-act="confirm-all">全部 ${pend.length} 筆確認，移去已核實記錄</button></div>`:''}
   </div>`:''}
@@ -1095,7 +1145,7 @@ function renderRecords(){
 }
 function resolveReview(id,same){
   const r=S.reviews.find(x=>x.id===id);if(!r)return;const a=S.txns.find(t=>t.id===r.a),b=S.txns.find(t=>t.id===r.b);
-  if(same&&a&&b){a.sources=[...new Set([...(a.sources||[a.source]),...(b.sources||[b.source])])];a.raw=[...(a.raw||[]),...(b.raw||[])];if(b.source==='applepay'){a.merchant=b.merchant;a.ts=b.ts}S.txns=S.txns.filter(t=>t.id!==b.id);trashPut('txn',b,{reason:'合併時移除'})}
+  if(same&&a&&b){a.sources=[...new Set([...(a.sources||[a.source]),...(b.sources||[b.source])])];a.raw=[...(a.raw||[]),...(b.raw||[])];if(b.source==='applepay'){a.merchant=b.merchant;a.ts=b.ts}if(GENERIC_CH.has(a.channel||'')&&!GENERIC_CH.has(b.channel||''))a.channel=b.channel;if(GENERIC_MER.test(a.merchant||'')&&!GENERIC_MER.test(b.merchant||''))a.merchant=b.merchant;S.txns=S.txns.filter(t=>t.id!==b.id);trashPut('txn',b,{reason:'合併時移除'})}
   [a,same?null:b].forEach(t=>{if(t)t.status='confirmed'});
   r.resolved=true;save();render();toast(same?'已合併為一筆':'已保留兩筆');
 }
@@ -1123,7 +1173,7 @@ function renderCards(){
     <label class="field"><span>Apple Pay 同短訊合併時間範圍</span><select id="merge-h">${[2,6,12,24,48].map(h=>`<option value="${h}" ${S.settings.mergeHours===h?'selected':''}>${h} 小時內同金額就當係同一筆候選</option>`).join('')}</select></label>
   </div>
   <div class="card"><div class="card-head"><h3>我的卡（本期回贈）</h3><button class="btn sm ghost" type="button" data-act="add-card">＋ 新增卡</button></div>
-    <div class="list">${S.cards.length?S.cards.map(c=>{const cy=rebateCycle(c),r=calcRebate(c,cardSpend(c,cy));return`<button class="li" type="button" data-act="edit-card" data-id="${esc(c.id)}" style="flex-wrap:wrap"><span class="grow"><span class="t" style="display:block">${esc(c.name)} <span class="badge">${TYPE_CARD[c.type]||c.type}</span>${c.collect===false?' <span class="badge">唔收集</span>':''}${c.auto?' <span class="badge">自動發現</span>':''}</span><span class="m">本期 ${cy.label} · 簽賬 ${money(r.spend)} · 預計回贈 ${money(r.total)}${r.rules?r.rules.filter(x=>x.left!=null).map(x=>` · ${esc(x.cats.join('/'))}額度尚餘 ${money(x.left)}`).join(''):r.capLeft!=null?` · 高回贈額度尚餘 ${money(r.capLeft)}`:''}</span>${r.capUsedPct!=null?`<span class="progress" style="display:block;margin-top:6px"><i style="width:${r.capUsedPct}%"></i></span>`:''}</span><span class="faint">›</span></button>${(()=>{const n=catCheckList(c,m).length;return n?`<button class="warn-chip" type="button" data-act="cat-check" data-id="${esc(c.id)}">⚠ ${n} 筆交易要核對分類（影響回贈）</button>`:''})()}`}).join(''):'<div class="empty">未有卡。匯入第一個 Apple Pay 通知或者短訊時會自動加入。</div>'}</div>
+    <div class="list">${S.cards.length?S.cards.map(c=>{const cy=rebateCycle(c),r=calcRebate(c,cardSpend(c,cy));return`<button class="li" type="button" data-act="edit-card" data-id="${esc(c.id)}" style="flex-wrap:wrap"><span class="grow"><span class="t" style="display:block">${esc(c.name)} <span class="badge">${TYPE_CARD[c.type]||c.type}</span>${c.collect===false?' <span class="badge">唔收集</span>':''}${c.auto?' <span class="badge">自動發現</span>':''}</span><span class="m">${c.type==='octopus'&&c.octoBal?`餘額 ${money(c.octoBal.bal)} · `:''}本期 ${cy.label} · 簽賬 ${money(r.spend)} · 預計回贈 ${money(r.total)}${r.rules?r.rules.filter(x=>x.left!=null).map(x=>` · ${esc(x.cats.join('/'))}額度尚餘 ${money(x.left)}`).join(''):r.capLeft!=null?` · 高回贈額度尚餘 ${money(r.capLeft)}`:''}</span>${r.capUsedPct!=null?`<span class="progress" style="display:block;margin-top:6px"><i style="width:${r.capUsedPct}%"></i></span>`:''}</span><span class="faint">›</span></button>${(()=>{const n=catCheckList(c,m).length;return n?`<button class="warn-chip" type="button" data-act="cat-check" data-id="${esc(c.id)}">⚠ ${n} 筆交易要核對分類（影響回贈）</button>`:''})()}`}).join(''):'<div class="empty">未有卡。匯入第一個 Apple Pay 通知或者短訊時會自動加入。</div>'}</div>
   </div>
   <div class="card"><h3>設定自動收集（iPhone 捷徑）</h3>
     <div class="small muted">iOS 唔俾網頁或者 app 直接讀短訊同 Wallet，所以用「捷徑」嘅自動化做中間人：每次拍卡或者收到銀行短訊，捷徑就將內容送去你嘅 Google 試算表「收件箱」，app 每 60 秒讀一次。</div>
@@ -1463,6 +1513,10 @@ function openCard(id){
       <div class="row2"><label class="field"><span>類別</span><select id="c-type">${Object.entries(TYPE_CARD).map(([k,v])=>`<option value="${k}" ${d.type===k?'selected':''}>${v}</option>`).join('')}</select></label>
       <label class="field"><span>收集呢張卡</span><label class="switch" style="margin-top:6px"><input type="checkbox" id="c-col" ${d.collect!==false?'checked':''}><span></span></label></label></div>
       <label class="field"><span>辨認字眼（用逗號分隔：卡尾 4 位、Wallet 入面張卡嘅名）</span><input id="c-kw" value="${esc((d.keywords||[]).join(', '))}" placeholder="例如：8821, HSBC Red"></label>
+      ${d.type==='octopus'?(()=>{const A=octoDefaults(d);return`<h3 style="margin-top:6px">八達通餘額計算</h3>
+      <div class="small muted">iPhone 收到「新餘額」通知時，會同上次餘額比較：減少 ＝ 支出，增加 ＝ 增值。</div>
+      <div class="row2"><label class="field"><span>自動增值</span><select id="o-on"><option value="1" ${A.on?'selected':''}>有</option><option value="0" ${A.on?'':'selected'}>冇</option></select></label><label class="field"><span>每次自動增值金額</span><input id="o-amt" inputmode="decimal" value="${esc(A.amt)}"></label></div>
+      <div class="row2"><label class="field"><span>八達通消費預設分類</span><select id="o-cat">${catOptions(A.cat)}</select></label><label class="field"><span>目前餘額（可修正起點）</span><input id="o-bal" inputmode="decimal" value="${d.octoBal?esc(d.octoBal.bal):''}" placeholder="等第一個通知"></label></div>`})():''}
       <h3 style="margin-top:6px">回贈</h3>
       <label class="field"><span>每月回贈重置日（例如月結單日之後嗰日）</span><select id="c-reset">${Array.from({length:31},(_,i)=>`<option value="${i+1}" ${(+R.resetDay||1)===i+1?'selected':''}>每月 ${i+1} 號</option>`).join('')}</select></label>
       <div class="seg"><button type="button" data-m="tier" aria-pressed="${R.mode==='tier'}">分級</button><button type="button" data-m="split" aria-pressed="${R.mode==='split'}">基本＋額外</button><button type="button" data-m="cat" aria-pressed="${R.mode==='cat'}">按分類</button></div>
@@ -1480,7 +1534,7 @@ function openCard(id){
       <div class="err" id="c-err" hidden></div>
       <div class="actions"><button class="btn" type="button" id="c-save">儲存</button>${isNew?'':'<button class="btn danger" type="button" id="c-del">刪除卡</button>'}</div>`,()=>{
         const val=q=>{const e=document.querySelector(q);return e?e.value.trim():''};
-        const grab=()=>{R.resetDay=+$('#c-reset').value||1;d.name=$('#c-name').value;d.type=$('#c-type').value;d.collect=$('#c-col').checked;d.keywords=$('#c-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);
+        const grab=()=>{if($('#o-on')){const A=octoDefaults(d);A.on=$('#o-on').value==='1';A.amt=num($('#o-amt').value)||0;A.cat=$('#o-cat').value;const b=$('#o-bal').value.trim();if(b!==''&&!isNaN(num(b))&&(!d.octoBal||num(b)!==d.octoBal.bal))d.octoBal={bal:num(b),ts:fmtLocal(new Date())}}R.resetDay=+$('#c-reset').value||1;d.name=$('#c-name').value;d.type=$('#c-type').value;d.collect=$('#c-col').checked;d.keywords=$('#c-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);
           if(R.mode==='tier')R.tiers.forEach((t,i)=>{const l=val(`[data-tl="${i}"]`);t.limit=l===''?'':num(l);t.pct=num(val(`[data-tp="${i}"]`))||0});
           else if(R.mode==='split'){R.basePct=num(val('#c-base'))||0;R.extraPct=num(val('#c-extra'))||0;const c=val('#c-cap');R.extraCap=c===''?'':num(c)}
           else{R.basePct=num(val('#c-base'))||0;R.catRules.forEach((r,i)=>{r.pct=num(val(`[data-rp="${i}"]`))||0;const c=val(`[data-rcap="${i}"]`);r.cap=c===''?'':num(c)})}};
@@ -1550,6 +1604,13 @@ document.addEventListener('click',e=>{
   else if(a==='drill'){ui.rec.mode='month';ui.rec.anchor=b.dataset.anchor;render()}
   else if(a==='drill-day'){ui.rec.mode='day';ui.rec.anchor=b.dataset.anchor;render()}
   else if(a==='rev-same'||a==='rev-diff')resolveReview(b.dataset.id,a==='rev-same');
+  else if(a==='one-click'){let mg=0,kept=0;
+    for(const rv of S.reviews.filter(x=>!x.resolved)){const A=S.txns.find(t=>t.id===rv.a),B=S.txns.find(t=>t.id===rv.b);if(!A||!B){rv.resolved=true;continue}
+      const sa=A.sources||[A.source],sb=B.sources||[B.source];
+      if(!sa.some(x=>sb.includes(x))){A.sources=[...new Set([...sa,...sb])];A.raw=[...(A.raw||[]),...(B.raw||[])];if(GENERIC_CH.has(A.channel||'')&&!GENERIC_CH.has(B.channel||''))A.channel=B.channel;if(GENERIC_MER.test(A.merchant||'')&&!GENERIC_MER.test(B.merchant||''))A.merchant=B.merchant;
+        S.txns=S.txns.filter(t=>t.id!==B.id);trashPut('txn',B,{reason:'一鍵核實：重複通知'});A.status='confirmed';rv.resolved=true;mg++}else kept++}
+    const open=new Set(S.reviews.filter(r=>!r.resolved).flatMap(r=>[r.a,r.b]));let n=0;S.txns.forEach(t=>{if(t.status!=='confirmed'&&!open.has(t.id)){t.status='confirmed';n++}});
+    save();render();toast(`已合併 ${mg} 組重複通知 · 確認 ${n} 筆${kept?` · ${kept} 組同一來源重複，留俾你決定`:''}`)}
   else if(a==='confirm-all'){const open=new Set(S.reviews.filter(r=>!r.resolved).flatMap(r=>[r.a,r.b]));let n=0;S.txns.forEach(t=>{if(t.status!=='confirmed'&&!open.has(t.id)){t.status='confirmed';n++}});save();render();toast(`已確認 ${n} 筆`)}
   else if(a==='ana-mode'){ui.ana.mode=b.dataset.mode;render()}
   else if(a==='ana-prev'||a==='ana-next'){ui.ana.anchor=shift(ui.ana.mode,ui.ana.anchor,a==='ana-prev'?-1:1);render()}
