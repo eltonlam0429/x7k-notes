@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.15-17';
+const APP_VERSION='2026.10.16-18';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -304,7 +304,7 @@ function merchantSim(a,b){
 
 /* ===================== 儲存 ===================== */
 const LS_KEY='ledger.v1';
-function blankState(){return{v:1,demo:false,inboxSince:0,txns:[],imported:{},lastImport:null,reviews:[],trash:[],incomeTemplates:[],incomeEntries:[],incomeOverrides:{},bills:[],billOverrides:{},cards:[],channels:{applepay:true,sms:true,octopus:true,notif:true,mail:true,cash:true},rules:{},settings:{mergeHours:12,hideIncome:false}}}
+function blankState(){return{v:1,demo:false,inboxSince:0,txns:[],imported:{},lastImport:null,reviews:[],trash:[],incomeTemplates:[],incomeEntries:[],incomeOverrides:{},bills:[],billOverrides:{},cards:[],channels:{applepay:true,sms:true,octopus:true,notif:true,mail:true,cash:true},rules:{},settings:{mergeHours:12,hideIncome:false,mailBlock:'moneyhero, moneysmart'}}}
 function load(){try{const s=localStorage.getItem(LS_KEY);if(!s)return null;const o=JSON.parse(s);return hydrate(o)}catch(e){return null}}
 let saveWarned=false;
 function localSave(){try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){if(!saveWarned){saveWarned=true;toast('未能儲存：瀏覽器唔俾用本機儲存空間')}}}
@@ -363,6 +363,7 @@ function migrateSched(x,isBill){
   else if(!x.startDate)x.startDate=(x.startMonth||curMonth())+'-01';
 }
 function migrate(s){
+  if(s.settings&&s.settings.mailBlock==null)s.settings.mailBlock='moneyhero, moneysmart';
   if(!Array.isArray(s.trash))s.trash=[];
   {const lim=fmtLocal(new Date(Date.now()-60*864e5));s.trash=s.trash.filter(x=>x.at>=lim)}
   if(s.channels&&s.channels.notif===undefined)s.channels.notif=true;
@@ -713,6 +714,22 @@ function parseWalletNotif(text){
   const channel=c?c.id:detectChannel(t,'notif');
   return{type,amount,merchant:m||(c?c.name:app?app[2]:'通知付款'),channel};
 }
+// 推廣電郵：寄件網域係 promo./marketing./news. 等，或者喺「略過寄件人」名單入面，一律唔記帳
+function mailBlocked(text){
+  const fm=String(text).match(/From:\s*([^¦]*?)\s*\(([^)]+)\)/i);const from=fm?(fm[1]+' '+fm[2]).toLowerCase():'';
+  if(!from)return false;
+  if(/\((?:promo|promotion|marketing|mkt|news|newsletter|edm|offers?|deals?|info)\./i.test('('+fm[2]))return true;
+  const list=String((S.settings||{}).mailBlock||'').toLowerCase().split(/[,，\s]+/).filter(Boolean);
+  return list.some(w=>from.includes(w));
+}
+// 清走已經記低咗嘅推廣電郵記錄（移去垃圾筒）
+function cleanBlockedMail(lines){
+  let n=0;const nz=x=>String(x).replace(/¦/g,' ').replace(/\s+/g,' ').trim();const bl=(lines||[]).filter(l=>mailBlocked(l)).map(nz);
+  const isB=t=>(t.raw||[]).some(x=>mailBlocked(x)||(x&&bl.some(l=>l.includes(nz(x)))));
+  S.txns=S.txns.filter(t=>{if((t.sources||[t.source]).every(x=>x==='mail')&&isB(t)){trashPut('txn',t,{reason:'推廣電郵'});n++;return false}return true});
+  S.incomeEntries=S.incomeEntries.filter(e=>{if(e.src==='mail'&&isB(e)){trashPut('income',e,{reason:'推廣電郵'});n++;return false}return true});
+  return n;
+}
 function producedBy(line){const hit=x=>x&&(x===line||line.includes(x));return S.txns.concat(S.trash.filter(e=>e.kind==='txn').map(e=>e.item)).some(t=>(t.raw||[]).some(hit))||S.incomeEntries.some(e=>(e.raw||[]).some(hit))}
 function importText(text,opts={}){
   const res={added:0,merged:0,review:0,skipped:0,dupe:0,income:0,src:{pay:0,sms:0,mail:0,ocr:0}};
@@ -727,6 +744,7 @@ function importText(text,opts={}){
       const src=r.kind==='mail'?'mail':'notif';
       if(!S.channels[src]){res.skipped++;continue}
       const ts=parseTime(r.parts[1])||fmtLocal(new Date());
+      if(src==='mail'&&mailBlocked(r.line)){res.skipped++;continue}
       if(src==='mail'){const bk=parseBankMail(r.parts.slice(2).join(' ¦ '));
         if(bk){if(bk.skip){res.skipped++;continue}S.imported[h]=1;ingest({ts,amount:bk.amount,merchant:bk.merchant,channel:bk.channel,type:bk.type,source:'mail'},r.line,res);continue}}
       const items=parseNotifs(r.parts.slice(2).join(' ¦ '),src==='mail');
@@ -741,8 +759,8 @@ function importText(text,opts={}){
       for(const it of items){
         const k='n'+hash(it.key);if(S.imported[k]){res.dupe++;continue}S.imported[k]=1;
         S.imported[h]=1;
-        if(it.type==='income')addIncomeAuto({ts,amount:it.amount,name:`${it.appName}${it.party?' · 由 '+it.party:' 收款'}`,src,raw:it.text},res);
-        else ingest({ts,amount:it.amount,merchant:it.party?`${it.appName} · ${it.party}`:it.appName,channel:it.card||(it.app!=='other'?notifChannel(it.app):detectChannel(it.text,src)),type:it.type,source:src,note:it.discount?`已扣除優惠券／折扣 $${it.discount}`:''},it.text,res);
+        if(it.type==='income')addIncomeAuto({ts,amount:it.amount,name:`${it.appName}${it.party?' · 由 '+it.party:' 收款'}`,src,raw:src==='mail'?r.line:it.text},res);
+        else ingest({ts,amount:it.amount,merchant:it.party?`${it.appName} · ${it.party}`:it.appName,channel:it.card||(it.app!=='other'?notifChannel(it.app):detectChannel(it.text,src)),type:it.type,source:src,note:it.discount?`已扣除優惠券／折扣 $${it.discount}`:''},src==='mail'?r.line:it.text,res);
       }
       continue;
     }
@@ -914,7 +932,7 @@ async function syncPull(manual){
       showBusy('讀取試算表中…')}
     const res=await api(null,{action:'pull',since:S.inboxSince||0,ver:SYNC.ver});
     if(res.sheetUrl)SYNC.sheetUrl=res.sheetUrl;
-    if(res.state&&res.ver>SYNC.ver&&!SYNC.dirty){S=hydrate(JSON.parse(res.state));SYNC.ver=res.ver;localSave()}
+    if(res.state&&res.ver>SYNC.ver&&!SYNC.dirty){S=hydrate(JSON.parse(res.state));SYNC.ver=res.ver;localSave();if(cleanBlockedMail())save()}
     if(res.rows&&res.rows.length){S.inboxSince=Math.max(S.inboxSince||0,res.last);r=importText(res.rows.map(x=>x[1]).join('\n'))}
     else if(res.last<(S.inboxSince||0)){S.inboxSince=res.last;save()}
     net.state='ok';SYNC.lastOk=fmtSec(new Date());storeSync();
@@ -927,9 +945,9 @@ async function syncPull(manual){
 async function rereadInbox(){
   if(!CONN){toast('要先連接 Google 試算表');return}
   showBusy('重新分析收件箱中…');
-  try{const res=await api(null,{action:'pull',since:0,ver:SYNC.ver});const r=importText((res.rows||[]).map(x=>x[1]).join('\n'),{reread:true});
+  try{const res=await api(null,{action:'pull',since:0,ver:SYNC.ver});const cleaned=cleanBlockedMail((res.rows||[]).map(x=>x[1]));const r=importText((res.rows||[]).map(x=>x[1]).join('\n'),{reread:true});
     S.inboxSince=Math.max(S.inboxSince||0,res.last||0);save();hideBusy();render();
-    toast(`重新分析完成：補返 ${r.added} 筆支出${r.income?`、${r.income} 筆收入`:''}${r.merged?`、合併 ${r.merged} 筆`:''}；仍然讀唔到 ${r.skipped} 行`)}
+    toast(`重新分析完成：${cleaned?`清走 ${cleaned} 筆推廣電郵記錄、`:''}補返 ${r.added} 筆支出${r.income?`、${r.income} 筆收入`:''}${r.merged?`、合併 ${r.merged} 筆`:''}；仍然讀唔到 ${r.skipped} 行`)}
   catch(e){hideBusy();toast('重新分析失敗：'+e.message)}
 }
 async function connect(url,token){
@@ -1170,6 +1188,8 @@ function renderCards(){
       <button class="btn" type="button" id="gs-go">連接</button>`}
   </div>
   <div class="card"><h3>收集渠道</h3><div class="list">${ch.map(([k,l,d])=>`<div class="li"><span class="grow"><span class="t" style="display:block">${l}</span><span class="m">${d}${({applepay:'pay',sms:'sms',mail:'mail',notif:'ocr'})[k]?` · 最近收到：${(S.lastSeen||{})[({applepay:'pay',sms:'sms',mail:'mail',notif:'ocr'})[k]]?(x=>`${+x.slice(5,7)}/${+x.slice(8,10)} ${x.slice(11,16)}`)(S.lastSeen[({applepay:'pay',sms:'sms',mail:'mail',notif:'ocr'})[k]]):'<b style="color:var(--red)">從未收到</b>'}`:''}</span></span><label class="switch"><input type="checkbox" data-ch="${k}" ${S.channels[k]?'checked':''} aria-label="${l}"><span></span></label></div>`).join('')}</div>
+    <label class="field"><span>電郵：略過以下寄件人（推廣郵件，用逗號分隔）</span><input id="mail-block" value="${esc(S.settings.mailBlock||'')}" placeholder="例如：moneyhero, moneysmart"></label>
+    <div class="small faint">寄件網域係 promo.、marketing.、news. 等開頭嘅推廣郵件會自動略過。</div>
     <label class="field"><span>Apple Pay 同短訊合併時間範圍</span><select id="merge-h">${[2,6,12,24,48].map(h=>`<option value="${h}" ${S.settings.mergeHours===h?'selected':''}>${h} 小時內同金額就當係同一筆候選</option>`).join('')}</select></label>
   </div>
   <div class="card"><div class="card-head"><h3>我的卡（本期回贈）</h3><button class="btn sm ghost" type="button" data-act="add-card">＋ 新增卡</button></div>
@@ -1221,6 +1241,7 @@ function renderCards(){
     <div class="sum-line small"><span class="faint">App 版本 ${APP_VERSION}</span><button class="btn sm line" type="button" data-act="check-update">檢查更新</button></div>
   </div>`;
   document.querySelectorAll('[data-ch]').forEach(i=>i.onchange=()=>{S.channels[i.dataset.ch]=i.checked;save();toast(i.checked?'已開啟收集':'已停止收集')});
+  $('#mail-block').onchange=e=>{S.settings.mailBlock=e.target.value;const n=cleanBlockedMail();save();render();toast(n?`已儲存，${n} 筆推廣電郵記錄移咗去垃圾筒`:'已儲存')};
   $('#merge-h').onchange=e=>{S.settings.mergeHours=+e.target.value;save();toast('已更新合併範圍')};
   arm($('#wipe'),()=>{const k=S.inboxSince;S=blankState();S.inboxSince=k;save();ui.month=curMonth();render();toast('已清除所有資料')},'再按一次：清除所有資料');
   const go=$('#gs-go');if(go)go.onclick=async()=>{const er=$('#gs-err');er.hidden=true;go.disabled=true;go.textContent='連接緊…';try{const had=await connect($('#gs-url').value,$('#gs-token').value);render();toast(had?'已連接，已載入試算表入面嘅資料':'已連接，之後嘅記錄會同步去試算表')}catch(e){er.textContent=e.message;er.hidden=false;go.disabled=false;go.textContent='連接'}};
@@ -1644,6 +1665,7 @@ function render(){
   updateBadge();
   $('#btn-hide').textContent=S.settings.hideIncome?'顯示收入':'隱藏收入';
 }
+{const n=cleanBlockedMail();if(n){save();setTimeout(()=>toast(`已清走 ${n} 筆推廣電郵記錄（喺垃圾筒可以還原）`),400)}}
 refreshStatuses();render();
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 setInterval(()=>{if(document.hidden)return;refreshStatuses();if(CONN)syncPull(false);else softRender()},60000);
