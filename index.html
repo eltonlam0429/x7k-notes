@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.18-27';
+const APP_VERSION='2026.10.18-28';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1263,16 +1263,17 @@ function renderCards(){
   </div>
   <div class="card"><h3>安裝「記帳送出」捷徑</h3>
     <div class="small muted">所有自動化都經呢個捷徑送資料去試算表。安裝時 iPhone 會叫你填網址同密碼；密碼只會存喺捷徑入面，呢個 app 唔會經手亦唔會儲存。</div>
+    <button class="btn line" type="button" data-act="copy-url">① 複製試算表網址</button>
     ${scButtons()}
-    <div class="actions"><button class="btn line" type="button" data-act="copy-url">複製試算表網址</button></div>
-    <div class="small faint">要先裝 ①，並保持「記帳送出」呢個名。②至⑤ 已經包含自動化觸發條件（iOS 27 或以上）：裝好之後去捷徑 app 嘅「自動化」頁，將佢哋嘅開關打開就開始運作。3 個短訊捷徑分別對應唔同關鍵字，用唔著嘅可以唔裝。</div>
+    <div class="small faint">要先做 ① 同 ②，並保持「記帳送出」呢個名。③至⑥ 已經包含自動化觸發條件（iOS 27 或以上）：裝好之後去捷徑 app 嘅「自動化」頁打開佢哋嘅開關。3 個短訊捷徑分別對應唔同關鍵字，用唔著嘅可以唔裝。</div>
+    <div class="small faint"><b>裝完點返嚟：</b>先試畫面左上角「◀ 記帳簿」。如果記帳 app 停咗喺空白頁：喺 App 切換器將記帳 app 向上掃走，再由主畫面打開，會直接返到「卡與渠道」呢頁，資料唔會唔見。</div>
   </div>
   <div class="card"><h3>設定自動收集（iPhone 捷徑）</h3>
     <div class="small muted">iOS 唔俾網頁讀短訊同通知，所以由捷徑嘅自動化轉交：收到付款通知或者銀行短訊時，捷徑將內容送去你嘅 Google 試算表，app 再讀返。以下用上面嘅安裝掣，大約 3 分鐘完成（需要 iOS 27 或以上）。</div>
     <details open><summary>① 安裝同開啟（第一次設定）</summary><ol class="steps">
       <li>先連接 Google 試算表（上面「Google 試算表」）。</li>
-      <li>撳<b>「① 安裝『記帳送出』」</b>→ 捷徑 app 會問網址同密碼：網址撳上面「複製試算表網址」再貼上；密碼係你 Code.gs 第 7 行嘅 TOKEN。<b>唔好改「記帳送出」個名</b>。</li>
-      <li>撳<b>「② 記帳通知」</b>同需要嘅<b>「③–⑤ 記帳短訊」</b>逐個安裝。撳咗會打開捷徑 app 安裝；裝完撳畫面左上角「◀ 記帳簿」（或者用 App 切換器）就返到呢度。</li>
+      <li>撳<b>「① 複製試算表網址」</b>，再撳<b>「② 安裝『記帳送出』」</b>→ 捷徑 app 會問網址同密碼：網址貼上啱啱複製嗰條；密碼係你 Code.gs 第 7 行嘅 TOKEN。<b>唔好改「記帳送出」個名</b>。</li>
+      <li>撳<b>「③ 記帳通知」</b>同需要嘅<b>「④–⑥ 記帳短訊」</b>逐個安裝。裝完返嚟方法見上面「裝完點返嚟」。</li>
       <li>打開捷徑 app 嘅<b>「自動化」</b>頁，將「記帳通知」同「記帳短訊」嘅<b>開關打開</b>（安裝後預設係關閉）。</li>
       <li>測試：用 Apple Pay／八達通付一筆小額，返嚟撳右上角「更新」，見到記錄就成功。</li></ol></details>
     <details><summary>② 改短訊關鍵字</summary><ol class="steps">
@@ -1742,7 +1743,7 @@ document.addEventListener('click',e=>{
   else if(a==='ana-cat'){ui.ana.cat=b.dataset.cat||null;render();if(ui.ana.cat)setTimeout(()=>{const c=document.querySelectorAll('#tab-analysis .card');c[c.length-1].scrollIntoView({behavior:'smooth',block:'start'})},30)}
   else if(a==='add-card')openCard();
   else if(a==='edit-card')openCard(b.dataset.id);
-  else if(a==='install-sc')installShortcut(b.dataset.file,b.dataset.name);
+  else if(a==='sc-go'){try{localStorage.setItem('ledger.tab','cards')}catch(e){}}
   else if(a==='copy-url'){if(!CONN){toast('未連接 Google 試算表，冇網址可以複製');return}const u=CONN.url;try{navigator.clipboard.writeText(u).then(()=>toast('已複製網址'),()=>toast(u))}catch(err){toast(u)}}
   else if(a==='copy'){const t=$('#'+b.dataset.src).textContent;try{navigator.clipboard.writeText(t).then(()=>toast('已複製'),()=>selectText(b.dataset.src))}catch(err){selectText(b.dataset.src)}}
   else if(a==='export-xlsx')saveFile(exportExcel(),`記帳簿-${todayKey()}.xlsx`);
@@ -1753,23 +1754,11 @@ document.addEventListener('click',e=>{
   else if(a==='check-update')checkUpdate(true);
   else if(a==='reread')rereadInbox();
 });
-// 安裝捷徑檔：喺隱藏框入面打開，主畫面 app 留喺原本頁面；捷徑 app 冇彈出就提供其他方法
-const SC_LIST=[['send','ledger-send','① 安裝「記帳送出」','記帳送出'],['notif','ledger-notif','② 安裝「記帳通知」','記帳通知'],['sms1','ledger-sms1','③ 記帳短訊 1','記帳短訊 1'],['sms2','ledger-sms2','④ 記帳短訊 2','記帳短訊 2'],['sms3','ledger-sms3','⑤ 記帳短訊 3','記帳短訊 3']];
+// 安裝捷徑檔：同 2026.10.18-23 一樣，直接打開 GitHub 上面嘅 .shortcut 檔
+const SC_LIST=[['ledger-send','② 安裝「記帳送出」'],['ledger-notif','③ 安裝「記帳通知」'],['ledger-sms1','④ 記帳短訊 1'],['ledger-sms2','⑤ 記帳短訊 2'],['ledger-sms3','⑥ 記帳短訊 3']];
 function scButtons(){
-  const one=([k,f,label,name],cls)=>`<button class="${cls}" type="button" data-act="install-sc" data-file="${f}.shortcut" data-name="${name}">${label}</button>`;
+  const one=([f,label],cls)=>`<a class="${cls}" style="text-align:center;text-decoration:none" href="${f}.shortcut" data-act="sc-go">${label}</a>`;
   return one(SC_LIST[0],'btn')+`<div class="actions">${one(SC_LIST[1],'btn ghost')}</div><div class="actions">${SC_LIST.slice(2).map(x=>one(x,'btn ghost')).join('')}</div>`;
-}
-function installShortcut(file,name){
-  if(IN_PREVIEW||!/^https?:/.test(location.protocol)){toast('預覽版唔可以安裝，請喺你 GitHub 上面嘅記帳 app 撳');return}
-  const abs=new URL(file,location.href).href;
-  let left=false;const onHide=()=>{if(document.hidden)left=true};document.addEventListener('visibilitychange',onHide);
-  const fr=document.createElement('iframe');fr.style.display='none';fr.src=abs;document.body.appendChild(fr);
-  setTimeout(()=>{document.removeEventListener('visibilitychange',onHide);setTimeout(()=>fr.remove(),60000);if(left)return;
-    openSheet('安裝「'+name+'」',`<div class="small muted">捷徑 app 冇自動彈出，揀其中一個方法：</div>
-      <a class="btn" style="text-align:center;text-decoration:none" href="${esc(abs)}" download="${esc(file)}">下載安裝檔</a>
-      <div class="small faint">下載後去「檔案」app →「下載項目」撳個檔，就會打開捷徑 app 安裝。呢個方法唔會離開記帳 app。</div>
-      <a class="btn ghost" style="text-align:center;text-decoration:none" href="${esc(abs)}">直接打開安裝檔</a>
-      <div class="small faint">會即刻打開捷徑 app 安裝，但記帳 app 會停喺空白頁：裝完喺 App 切換器將記帳 app 向上掃走，再由主畫面重新打開就得，資料唔會唔見。</div>`)},1800);
 }
 function selectText(id){const r=document.createRange();r.selectNodeContents($('#'+id));const s=getSelection();s.removeAllRanges();s.addRange(r);toast('已選取，撳「拷貝」')}
 $('#file-inbox').onchange=async e=>{const f=e.target.files[0];if(!f)return;const t=await f.text();e.target.value='';showImportResult(importText(t))};
