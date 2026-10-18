@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.18-19';
+const APP_VERSION='2026.10.18-20';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1261,6 +1261,12 @@ function renderCards(){
   <div class="card"><div class="card-head"><h3>我的卡（本期回贈）</h3><button class="btn sm ghost" type="button" data-act="add-card">＋ 新增卡</button></div>
     <div class="list">${S.cards.length?S.cards.map(c=>{const cy=rebateCycle(c),r=calcRebate(c,cardSpend(c,cy),rebateAt(c,cy.s));return`<button class="li" type="button" data-act="edit-card" data-id="${esc(c.id)}" style="flex-wrap:wrap"><span class="grow"><span class="t" style="display:block">${esc(c.name)} <span class="badge">${TYPE_CARD[c.type]||c.type}</span>${c.collect===false?' <span class="badge">唔收集</span>':''}${c.auto?' <span class="badge">自動發現</span>':''}</span><span class="m">${c.type==='octopus'&&c.octoBal?`餘額 ${money(c.octoBal.bal)} · `:''}本期 ${cy.label} · 簽賬 ${money(r.spend)} · 預計回贈 ${money(r.total)}${r.rules?r.rules.filter(x=>x.left!=null).map(x=>` · ${esc(x.cats.join('/'))}額度尚餘 ${money(x.left)}`).join(''):r.capLeft!=null?` · 高回贈額度尚餘 ${money(r.capLeft)}`:''}</span>${r.capUsedPct!=null?`<span class="progress" style="display:block;margin-top:6px"><i style="width:${r.capUsedPct}%"></i></span>`:''}</span><span class="faint">›</span></button>${(()=>{const n=catCheckList(c,m).length;return n?`<button class="warn-chip" type="button" data-act="cat-check" data-id="${esc(c.id)}">⚠ ${n} 筆交易要核對分類（影響回贈）</button>`:''})()}`}).join(''):'<div class="empty">未有卡。匯入第一個 Apple Pay 通知或者短訊時會自動加入。</div>'}</div>
   </div>
+  <div class="card"><h3>安裝「記帳送出」捷徑</h3>
+    <div class="small muted">所有自動化都經呢個捷徑送資料去試算表。安裝時 iPhone 會叫你填網址同密碼；密碼只會存喺捷徑入面，呢個 app 唔會經手亦唔會儲存。</div>
+    <a class="btn" style="text-align:center;text-decoration:none" href="ledger-send.shortcut">安裝記帳捷徑</a>
+    <div class="actions"><button class="btn line" type="button" data-act="copy-url">複製試算表網址</button></div>
+    <div class="small faint">安裝後，每個自動化只需要兩個動作：「文字」（例如 sms || 目前日期 || 內容），再加「執行捷徑：記帳送出」，輸入揀「文字」。</div>
+  </div>
   <div class="card"><h3>設定自動收集（iPhone 捷徑）</h3>
     <div class="small muted">iOS 唔俾網頁或者 app 直接讀短訊同 Wallet，所以用「捷徑」嘅自動化做中間人：每次拍卡或者收到銀行短訊，捷徑就將內容送去你嘅 Google 試算表「收件箱」，app 每 60 秒讀一次。</div>
     <details><summary>① Apple Pay / 八達通（交易自動化）</summary><ol class="steps">
@@ -1737,6 +1743,7 @@ document.addEventListener('click',e=>{
   else if(a==='ana-cat'){ui.ana.cat=b.dataset.cat||null;render();if(ui.ana.cat)setTimeout(()=>{const c=document.querySelectorAll('#tab-analysis .card');c[c.length-1].scrollIntoView({behavior:'smooth',block:'start'})},30)}
   else if(a==='add-card')openCard();
   else if(a==='edit-card')openCard(b.dataset.id);
+  else if(a==='copy-url'){if(!CONN){toast('未連接 Google 試算表，冇網址可以複製');return}const u=CONN.url;try{navigator.clipboard.writeText(u).then(()=>toast('已複製網址'),()=>toast(u))}catch(err){toast(u)}}
   else if(a==='copy'){const t=$('#'+b.dataset.src).textContent;try{navigator.clipboard.writeText(t).then(()=>toast('已複製'),()=>selectText(b.dataset.src))}catch(err){selectText(b.dataset.src)}}
   else if(a==='export-xlsx')saveFile(exportExcel(),`記帳簿-${todayKey()}.xlsx`);
   else if(a==='export-json')saveFile(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}),`記帳簿備份-${todayKey()}.json`);
