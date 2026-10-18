@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.18-28';
+const APP_VERSION='2026.10.18-30';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -304,7 +304,7 @@ function merchantSim(a,b){
 
 /* ===================== 儲存 ===================== */
 const LS_KEY='ledger.v1';
-function blankState(){return{v:1,demo:false,inboxSince:0,txns:[],imported:{},lastImport:null,reviews:[],trash:[],incomeTemplates:[],incomeEntries:[],incomeOverrides:{},bills:[],billOverrides:{},cards:[],channels:{applepay:true,sms:true,octopus:true,notif:true,mail:true,cash:true},rules:{},settings:{mergeHours:12,hideIncome:false,mailBlock:'moneyhero, moneysmart',smsBlock:''}}}
+function blankState(){return{v:1,demo:false,inboxSince:0,txns:[],imported:{},lastImport:null,reviews:[],trash:[],incomeTemplates:[],incomeEntries:[],incomeOverrides:{},bills:[],billOverrides:{},cards:[],channels:{applepay:true,sms:true,octopus:true,notif:true,mail:true,cash:true},rules:{},mailSenders:{},settings:{mergeHours:12,hideIncome:false,mailBlock:'moneyhero, moneysmart',smsBlock:''}}}
 function load(){try{const s=localStorage.getItem(LS_KEY);if(!s)return null;const o=JSON.parse(s);return hydrate(o)}catch(e){return null}}
 let saveWarned=false;
 function localSave(){try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){if(!saveWarned){saveWarned=true;toast('未能儲存：瀏覽器唔俾用本機儲存空間')}}}
@@ -430,7 +430,7 @@ function incomeItems(m){
     out.push({id:t.id,src:'tpl',name:t.name,kind:t.kind,amount:r2(per*occ.length),per,n:occ.length,adjusted:ov!=null,tpl:t,actual:act||null});
   }
   // 交易記錄入面類型係「收入」、冇對應收入設定嘅，當單一收入計
-  for(const x of S.txns)if(x.type==='income'&&!x.linkTpl&&!(x.suggestTpl&&x.status!=='confirmed')&&x.ts.startsWith(m))out.push({id:x.id,src:'txn',name:x.merchant||'收入',kind:'other',amount:x.amount,day:+x.ts.slice(8,10),auto:true});
+  for(const x of S.txns)if(x.type==='income'&&!x.linkTpl&&x.status==='confirmed'&&x.ts.startsWith(m))out.push({id:x.id,src:'txn',name:x.merchant||'收入',kind:'other',amount:x.amount,day:+x.ts.slice(8,10),auto:true});
   for(const e of S.incomeEntries)if(e.month===m)out.push({id:e.id,src:'entry',name:e.name,kind:e.kind,amount:e.amount,day:e.day||null,auto:!!e.auto});
   return out;
 }
@@ -638,19 +638,39 @@ function learnKw(obj,name){
   if(w.length<3||GENERIC_MER.test(w))return;obj.keywords=obj.keywords||[];if(!obj.keywords.some(k=>k.toLowerCase()===w.toLowerCase()))obj.keywords.push(w);obj.keywords=obj.keywords.slice(-10);
 }
 // 收到收入：對應到定期收入就當實際出糧（金額一樣自動確認，唔同就等你核實），否則當單一收入
+// 電郵嚟嘅收入（寄件人未放白名單）唔會自動計，要你核實
+function mailNeedsCheck(e,text){return e.src==='mail'&&senderStatus(mailSender(text||e.raw))!=='w'}
 function routeIncome(e,res,text){
+  const chk=mailNeedsCheck(e,text);
   const mt=matchIncomeTpl(text||e.name,e.ts);
   if(mt){
     const W=S.settings.mergeHours;
     const dup=S.txns.find(x=>x.type==='income'&&Math.abs(x.amount-e.amount)<0.005&&Math.abs(toDate(x.ts)-toDate(e.ts))/36e5<=W);
     if(dup){dup.raw=[...(dup.raw||[]),e.raw];dup.sources=[...new Set([...(dup.sources||[]),e.src])];if(res)res.merged++;return}
     const already=S.txns.some(x=>x.linkTpl===mt.tpl.id&&x.linkMonth===mt.M);
-    const same=!already&&Math.abs(mt.expected-e.amount)<0.005;
+    const same=!chk&&!already&&Math.abs(mt.expected-e.amount)<0.005;
     S.txns.push({id:uid(),ts:e.ts,amount:r2(e.amount),merchant:e.name,category:'其他',channel:'bank',type:'income',status:same?'confirmed':'pending',source:e.src,sources:[e.src],raw:[e.raw],note:same?'同收入設定金額一樣，已自動確認':already?`「${mt.tpl.name}」${+mt.M.slice(5)} 月已經收到一筆`:'',catChecked:true,
       ...(same?{linkTpl:mt.tpl.id,linkMonth:mt.M}:{suggestTpl:mt.tpl.id,linkMonth:mt.M})});
     if(res){res.income++;if(!same)res.review++}return;
   }
+  if(chk){
+    const W=S.settings.mergeHours;
+    // 其他來源（例如短訊／通知）已經記咗同一筆收入，就當佐證，唔再加
+    const dup=S.incomeEntries.find(x=>x.auto&&x.src!=='mail'&&x.ts&&Math.abs(x.amount-e.amount)<0.005&&Math.abs(toDate(x.ts)-toDate(e.ts))/36e5<=W)||S.txns.find(x=>x.type==='income'&&x.source!=='mail'&&Math.abs(x.amount-e.amount)<0.005&&Math.abs(toDate(x.ts)-toDate(e.ts))/36e5<=W);
+    if(dup){dup.raw=[...(dup.raw||[]),e.raw];if(res)res.merged++;return dup}
+    const t={id:uid(),ts:e.ts,amount:r2(e.amount),merchant:e.name,category:'其他',channel:'bank',type:'income',status:'pending',source:'mail',sources:['mail'],raw:[e.raw],note:'電郵收入，要你核實',catChecked:true,mailCheck:true};
+    S.txns.push(t);if(res){res.income++;res.review++}return t;
+  }
   return addIncomeAuto(e,res);
+}
+// 舊版自動當咗收入嘅電郵記錄（寄件人未放白名單）改返做待核實
+function pendMailIncome(){
+  let n=0;S.incomeEntries=S.incomeEntries.filter(e=>{
+    const raws=e.raw||[];
+    if(e.src==='mail'&&e.auto&&raws.length&&raws.every(r=>/^\s*mail\s*\|\|/.test(r))&&senderStatus(mailSender(raws[0]))!=='w'){
+      S.txns.push({id:e.id,ts:e.ts||`${e.month}-${String(e.day||1).padStart(2,'0')}T12:00`,amount:e.amount,merchant:e.name,category:'其他',channel:'bank',type:'income',status:'pending',source:'mail',sources:['mail'],raw:raws,note:'電郵收入，要你核實',catChecked:true,mailCheck:true});n++;return false}
+    return true});
+  return n;
 }
 function matchBill(t){
   if(t.type!=='expense')return null;const txt=[t.merchant,...(t.raw||[])].join(' ');
@@ -770,9 +790,37 @@ function parseWalletNotif(text){
   return{type,amount,merchant:m||(c?c.name:app?app[2]:'通知付款'),channel};
 }
 // 推廣電郵：寄件網域係 promo./marketing./news. 等，或者喺「略過寄件人」名單入面，一律唔記帳
+// 電郵寄件人：{key,addr,dom,name}（舊記錄冇完整地址，就用 @網域 做 key）
+function mailSender(text){
+  const fm=String(text||'').match(/From:\s*([^¦]*?)\s*\(([^)]+)\)/i);if(!fm)return null;
+  const dom=fm[2].trim().toLowerCase();const am=fm[1].match(/<?([^<>\s]+@[^<>\s]+)>?/);
+  const addr=am?am[1].toLowerCase():'';const name=fm[1].replace(/<?[^<>\s]+@[^<>\s]+>?/,'').replace(/^["']|["']$/g,'').trim()||dom;
+  return{key:addr||'@'+dom,addr,dom,name};
+}
+function senderStatus(m){
+  if(!m)return'';const L=S.mailSenders||{};
+  if(m.addr&&L[m.addr]&&L[m.addr].st)return L[m.addr].st;
+  if(L['@'+m.dom]&&L['@'+m.dom].st)return L['@'+m.dom].st;
+  // 舊記錄冇地址：同網域、同名嘅寄件人已經揀咗，就跟佢
+  if(!m.addr){const hit=Object.values(L).find(v=>v.st&&v.dom===m.dom&&String(v.name).toLowerCase()===String(m.name).toLowerCase());if(hit)return hit.st}
+  return'';
+}
+// 每封放入收件箱嘅電郵都記低寄件人（同一封唔會重複計）
+function noteSender(line){
+  const m=mailSender(line);if(!m)return;S.mailSenders=S.mailSenders||{};
+  const k='m'+hash(line);const ts=(String(line).split('||')[1]||'').trim().slice(0,16);
+  const o=S.mailSenders[m.key]=S.mailSenders[m.key]||{name:m.name,addr:m.addr,dom:m.dom,n:0,last:'',st:''};
+  if(m.name&&m.name!==m.dom)o.name=m.name;
+  if(S.imported[k])return;S.imported[k]=1;o.n++;if(ts>o.last)o.last=ts;
+}
+function collectSenders(){
+  const raws=[...S.txns.flatMap(t=>t.raw||[]),...S.incomeEntries.flatMap(e=>e.raw||[]),...S.trash.flatMap(x=>(x.item&&x.item.raw)||[])];
+  raws.forEach(r=>{if(/^\s*mail\s*\|\|/.test(r))noteSender(r)});
+}
 function mailBlocked(text){
   const fm=String(text).match(/From:\s*([^¦]*?)\s*\(([^)]+)\)/i);const from=fm?(fm[1]+' '+fm[2]).toLowerCase():'';
   if(!from)return false;
+  {const st=senderStatus(mailSender(text));if(st==='b')return true;if(st==='w')return false}
   if(/\((?:promo|promotion|marketing|mkt|news|newsletter|edm|offers?|deals?|info)\./i.test('('+fm[2]))return true;
   const list=String((S.settings||{}).mailBlock||'').toLowerCase().split(/[,，\s]+/).filter(Boolean);
   return list.some(w=>from.includes(w));
@@ -785,6 +833,17 @@ function cleanBlockedMail(lines){
   S.incomeEntries=S.incomeEntries.filter(e=>{if(e.src==='mail'&&isB(e)){trashPut('income',e,{reason:'推廣電郵'});n++;return false}return true});
   return n;
 }
+// 揀白名單／黑名單：黑名單即刻清走舊記錄；白名單即刻確認佢嘅電郵收入
+function setSender(k,st,m){
+  if(!k)return;S.mailSenders=S.mailSenders||{};
+  const o=S.mailSenders[k]=S.mailSenders[k]||{name:m?m.name:k,addr:m?m.addr:'',dom:m?m.dom:k.replace(/^.*@/,''),n:0,last:'',st:''};
+  o.st=st;let n=0;
+  if(st==='b')n=cleanBlockedMail();
+  else if(st==='w')S.txns.forEach(t=>{if(t.mailCheck&&t.status!=='confirmed'&&!t.suggestTpl&&senderStatus(mailSender((t.raw||[])[0]))==='w'){t.status='confirmed';delete t.mailCheck;t.note='';n++}});
+  else n=pendMailIncome();
+  save();render();
+  toast(st==='b'?`已加入黑名單${n?`，${n} 筆記錄移咗去垃圾筒`:''}，以後自動略過`:st==='w'?`已加入白名單${n?`，確認咗 ${n} 筆收入`:''}`:'已改返未決定');
+}
 function smsBlocked(text){const list=String((S.settings||{}).smsBlock||'').split(/[,，]/).map(x=>x.trim().toLowerCase()).filter(Boolean);const t=String(text).toLowerCase();return list.some(w=>t.includes(w))}
 function cleanBlockedSms(){let n=0;S.txns=S.txns.filter(t=>{if((t.sources||[t.source]).every(x=>x==='sms')&&(t.raw||[]).some(smsBlocked)){trashPut('txn',t,{reason:'短訊略過字眼'});n++;return false}return true});
   S.incomeEntries=S.incomeEntries.filter(e=>{if(e.src==='sms'&&(e.raw||[]).some(smsBlocked)){trashPut('income',e,{reason:'短訊略過字眼'});n++;return false}return true});return n}
@@ -794,6 +853,7 @@ function importText(text,opts={}){
   S.lastSeen=S.lastSeen||{};
   for(const r of parseInbox(text)){
     if(res.src[r.kind]!=null&&!r.pasted){res.src[r.kind]++;S.lastSeen[r.kind]=fmtLocal(new Date())}
+    if(r.kind==='mail')noteSender(r.line);
     // 已處理過嘅行唔會再讀；「重新分析」時會補返之前讀唔到（冇產生記錄）嘅行
     const h=hash(r.line);const prev=S.imported[h];
     if(prev&&!(opts.reread&&(prev==='s'||!producedBy(r.line)))){res.dupe++;continue}
@@ -992,7 +1052,7 @@ async function syncPull(manual){
       showBusy('讀取試算表中…')}
     const res=await api(null,{action:'pull',since:S.inboxSince||0,ver:SYNC.ver});
     if(res.sheetUrl)SYNC.sheetUrl=res.sheetUrl;
-    if(res.state&&res.ver>SYNC.ver&&!SYNC.dirty){S=hydrate(JSON.parse(res.state));SYNC.ver=res.ver;localSave();if(cleanBlockedMail())save()}
+    if(res.state&&res.ver>SYNC.ver&&!SYNC.dirty){S=hydrate(JSON.parse(res.state));SYNC.ver=res.ver;localSave();collectSenders();if(cleanBlockedMail()+pendMailIncome())save()}
     if(res.rows&&res.rows.length){S.inboxSince=Math.max(S.inboxSince||0,res.last);r=importText(res.rows.map(x=>x[1]).join('\n'))}
     else if(res.last<(S.inboxSince||0)){S.inboxSince=res.last;save()}
     net.state='ok';SYNC.lastOk=fmtSec(new Date());storeSync();
@@ -1189,7 +1249,8 @@ function renderRecords(){
   const open=S.reviews.filter(r=>!r.resolved&&S.txns.find(t=>t.id===r.a)&&S.txns.find(t=>t.id===r.b));
   const inRev=new Set(open.flatMap(r=>[r.a,r.b]));
   const sugg=S.txns.filter(t=>t.status!=='confirmed'&&(t.suggestTpl||t.suggestBill));
-  const pend=S.txns.filter(t=>t.status!=='confirmed'&&!inRev.has(t.id)&&!t.suggestTpl&&!t.suggestBill).sort((a,b)=>a.ts<b.ts?1:-1);
+  const mchk=S.txns.filter(t=>t.status!=='confirmed'&&t.mailCheck&&!t.suggestTpl).sort((a,b)=>a.ts<b.ts?1:-1);
+  const pend=S.txns.filter(t=>t.status!=='confirmed'&&!inRev.has(t.id)&&!t.suggestTpl&&!t.suggestBill&&!t.mailCheck).sort((a,b)=>a.ts<b.ts?1:-1);
   // 已核實嗰筆喺度只作參考，唔可以喺待核實區改或刪，避免誤刪真正記錄
   const rvRow=t=>t.status==='confirmed'?txRow(t).replace(/^<button class="li" type="button" data-act="edit" data-id="[^"]*"/,'<div class="li ref"').replace(/<\/button>$/,'</div>'):txRow(t);
   const tag=t=>t.status==='confirmed'?'<div class="rv-tag ok">現有記錄 · 已核實</div>':'<div class="rv-tag new">新收到 · 待核實</div>';
@@ -1206,14 +1267,17 @@ function renderRecords(){
   }
   $('#tab-records').innerHTML=`
   <div class="page-head"><div><div class="eyebrow">逐筆睇清楚，錯咗即刻改。</div><h1>記錄與核實</h1></div><div class="actions" style="flex:none"><button class="btn sm line" type="button" data-act="trash">垃圾筒${S.trash.length?`（${S.trash.length}）`:''}</button><button class="btn sm" type="button" data-act="new-tx">＋ 新增支出</button></div></div>
-  ${open.length||pend.length||sugg.length?`<div class="card pending-zone"><div class="card-head"><h3>待核實</h3><span class="small muted">${open.length} 組可能重複 · ${pend.length} 筆待確認</span></div>
+  ${open.length||pend.length||sugg.length||mchk.length?`<div class="card pending-zone"><div class="card-head"><h3>待核實</h3><span class="small muted">${open.length} 組可能重複 · ${pend.length+mchk.length} 筆待確認</span></div>
     <div class="small muted">呢度嘅記錄未計入下面嘅已核實記錄。撳入去可以改或刪除，確認之後就會移落去。</div>
     ${sugg.map(t=>{const T=t.suggestTpl&&S.incomeTemplates.find(x=>x.id===t.suggestTpl);const B=t.suggestBill&&S.bills.find(x=>x.id===t.suggestBill.bid);
       const exp=T?(((S.incomeOverrides[T.id]||{})[t.linkMonth])??T.amount):B?((((S.billOverrides[B.id]||{})[t.suggestBill.key])||{}).amount??B.amount):0;
       return`<div class="review"><div class="q">${T?`收到 ${money(t.amount)}，似係「${esc(T.name)}」${+t.linkMonth.slice(5)} 月（設定 ${money(+exp)}），${t.note&&/已經收到一筆/.test(t.note)?`（注意：${esc(t.note)}）`:''}`:`扣咗 ${money(t.amount)}，似係定期支出「${esc(B.name)}」（設定 ${money(+exp)}），金額唔同。`}</div><div class="list">${txRow(t)}</div>
       <div class="acts"><button class="btn sm" type="button" data-act="sg-replace" data-id="${t.id}">用實際金額取代${T?`${+t.linkMonth.slice(5)} 月收入`:'嗰期'}</button><button class="btn sm ghost" type="button" data-act="sg-extra" data-id="${t.id}">${T?'當額外收入（另計）':'當普通支出（另計）'}</button>${T?`<button class="btn sm line" type="button" data-act="sg-not" data-id="${t.id}">唔係收入（不計）</button>`:''}</div></div>`}).join('')}
+    ${mchk.length?`<div class="small muted" style="margin-top:8px">電郵收入（${mchk.length} 筆）：未確認之前唔會計入收入。如果係推廣電郵，撳「封鎖寄件人」，以後同一個寄件人都會自動略過。</div>`:''}
+    ${mchk.slice(0,40).map(t=>{const m=mailSender((t.raw||[])[0]);return`<div class="review"><div class="q">電郵話收到 ${money(t.amount)}。寄件人：<b>${esc(m?m.name:'不明')}</b>${m?` <span class="faint" style="overflow-wrap:anywhere;display:block">${esc(m.addr||'@'+m.dom)}</span>`:''}</div><div class="list">${txRow(t)}</div>
+      <div class="acts"><button class="btn sm" type="button" data-act="mc-ok" data-id="${t.id}">係收入</button>${m?`<button class="btn sm ghost" type="button" data-act="mc-white" data-id="${t.id}">信任寄件人（白名單）</button>`:''}<button class="btn sm line" type="button" data-act="mc-no" data-id="${t.id}">唔係收入</button>${m?`<button class="btn sm line" type="button" data-act="mc-black" data-id="${t.id}" style="color:var(--red)">封鎖寄件人（黑名單）</button>`:''}</div></div>`}).join('')}
     <button class="btn" type="button" data-act="one-click">一鍵核實</button>
-    <div class="small faint">一鍵核實：唔同來源（例如通知同電郵）收到同一金額，第二次當重複，合併做一筆唔再計支出；同一來源重複出現嘅會留低俾你決定；其餘待確認記錄全部確認。</div>
+    <div class="small faint">一鍵核實：唔同來源（例如通知同電郵）收到同一金額，第二次當重複，合併做一筆唔再計支出；同一來源重複出現嘅會留低俾你決定；其餘待確認記錄全部確認（電郵收入除外，要逐筆揀）。</div>
     ${open.map(r=>{const a=S.txns.find(t=>t.id===r.a),b=S.txns.find(t=>t.id===r.b);const mins=Math.round(Math.abs(toDate(a.ts)-toDate(b.ts))/6e4);return`<div class="review"><div class="q">${r.kind==='repeat'?`同一商戶、同一金額，相隔 ${mins} 分鐘。係一筆定兩筆？`:`${SRC_L[a.source]||'通知'} 同 ${SRC_L[b.source]||'通知'} 金額一樣（相隔 ${mins>=60?Math.round(mins/6)/10+' 小時':mins+' 分鐘'}），可能係同一筆。`}</div><div class="list">${tag(a)}${rvRow(a)}${tag(b)}${rvRow(b)}</div><label class="field"><span>分類（自動判斷，可以改）</span><select data-act="rev-cat" data-id="${r.id}">${catOptions(a.category)}</select></label><div class="acts"><button class="btn sm" type="button" data-act="rev-same" data-id="${r.id}">同一筆，合併</button><button class="btn sm ghost" type="button" data-act="rev-diff" data-id="${r.id}">${r.kind==='repeat'?'真係兩筆（多次）':'唔同交易，保留兩筆'}</button></div><div class="small faint">「合併」會保留上面嗰筆，下面嗰筆會移去垃圾筒。</div></div>`}).join('')}
     ${pend.length?`<div class="list">${pend.slice(0,30).map(txRow).join('')}</div><div class="actions"><button class="btn ghost" type="button" data-act="confirm-all">全部 ${pend.length} 筆確認，移去已核實記錄</button></div>`:''}
   </div>`:''}
@@ -1255,6 +1319,13 @@ function renderCards(){
   <div class="card"><h3>收集渠道</h3><div class="list">${ch.map(([k,l,d])=>`<div class="li"><span class="grow"><span class="t" style="display:block">${l}</span><span class="m">${d}${({applepay:'pay',sms:'sms',mail:'mail',notif:'ocr'})[k]?` · 最近收到：${(S.lastSeen||{})[({applepay:'pay',sms:'sms',mail:'mail',notif:'ocr'})[k]]?(x=>`${+x.slice(5,7)}/${+x.slice(8,10)} ${x.slice(11,16)}`)(S.lastSeen[({applepay:'pay',sms:'sms',mail:'mail',notif:'ocr'})[k]]):'<b style="color:var(--red)">從未收到</b>'}`:''}</span></span><label class="switch"><input type="checkbox" data-ch="${k}" ${S.channels[k]?'checked':''} aria-label="${l}"><span></span></label></div>`).join('')}</div>
     <label class="field"><span>電郵：略過以下寄件人（推廣郵件，用逗號分隔）</span><input id="mail-block" value="${esc(S.settings.mailBlock||'')}" placeholder="例如：moneyhero, moneysmart"></label>
     <div class="small faint">寄件網域係 promo.、marketing.、news. 等開頭嘅推廣郵件會自動略過。</div>
+    ${(()=>{const L=Object.entries(S.mailSenders||{});if(!L.length)return'<div class="small faint" style="margin-top:8px">電郵寄件人：未收過電郵。</div>';
+      const ord={'':0,b:2,w:1};L.sort((x,y)=>(ord[x[1].st||'']-ord[y[1].st||''])||(x[1].last<y[1].last?1:-1));
+      const nu=L.filter(x=>!x[1].st).length,nb=L.filter(x=>x[1].st==='b').length,nw=L.filter(x=>x[1].st==='w').length;
+      return`<details class="senders" style="margin-top:10px"${nu?' open':''}><summary class="t" style="cursor:pointer;padding:6px 0">電郵寄件人（${L.length}）· 未決定 ${nu} · 白名單 ${nw} · 黑名單 ${nb}</summary>
+      <div class="small faint" style="margin-bottom:6px">每封放入收件箱嘅電郵都會記低寄件人。黑名單：以後自動略過，舊記錄移去垃圾筒。白名單：佢嘅收入唔使再核實。未決定：收入要你逐筆確認。</div>
+      <div class="list">${L.map(([k,v])=>`<div class="li" style="flex-wrap:wrap;gap:6px"><span class="grow" style="min-width:0"><span class="t" style="display:block;overflow-wrap:anywhere">${esc(v.name||v.dom)}</span><span class="m" style="overflow-wrap:anywhere">${esc(v.addr||'@'+v.dom+'（舊記錄，整個網域）')} · ${v.n} 封${v.last?` · 最近 ${+v.last.slice(5,7)}/${+v.last.slice(8,10)}`:''}</span></span>
+        <span class="seg" role="group" aria-label="名單" style="margin:0;flex:1 1 100%">${[['w','白名單'],['','未決定'],['b','黑名單']].map(([st,l])=>`<button type="button" data-act="ms-set" data-k="${esc(k)}" data-st="${st}" aria-pressed="${(v.st||'')===st}">${l}</button>`).join('')}</span></div>`).join('')}</div></details>`})()}
     <label class="field"><span>短訊：包含以下字眼就略過（推廣／詐騙，用逗號分隔）</span><input id="sms-block" value="${esc(S.settings.smsBlock||'')}" placeholder="例如：優惠, 推廣, 中獎, 點擊連結, 貸款"></label>
     <label class="field"><span>Apple Pay 同短訊合併時間範圍</span><select id="merge-h">${[2,6,12,24,48].map(h=>`<option value="${h}" ${S.settings.mergeHours===h?'selected':''}>${h} 小時內同金額就當係同一筆候選</option>`).join('')}</select></label>
   </div>
@@ -1265,14 +1336,14 @@ function renderCards(){
     <div class="small muted">所有自動化都經呢個捷徑送資料去試算表。安裝時 iPhone 會叫你填網址同密碼；密碼只會存喺捷徑入面，呢個 app 唔會經手亦唔會儲存。</div>
     <button class="btn line" type="button" data-act="copy-url">① 複製試算表網址</button>
     ${scButtons()}
-    <div class="small faint">要先做 ① 同 ②，並保持「記帳送出」呢個名。③至⑥ 已經包含自動化觸發條件（iOS 27 或以上）：裝好之後去捷徑 app 嘅「自動化」頁打開佢哋嘅開關。3 個短訊捷徑分別對應唔同關鍵字，用唔著嘅可以唔裝。</div>
+    <div class="small faint">要先做 ① 同 ②。② 裝好之後捷徑名稱係「ledger-send」，③至⑥ 會用呢個名搵佢，所以<b>唔好改名</b>。③至⑥ 已經包含自動化觸發條件（iOS 27 或以上）：裝好之後去捷徑 app 嘅「自動化」頁打開佢哋嘅開關。3 個短訊捷徑分別對應唔同關鍵字，用唔著嘅可以唔裝。</div>
     <div class="small faint"><b>裝完點返嚟：</b>先試畫面左上角「◀ 記帳簿」。如果記帳 app 停咗喺空白頁：喺 App 切換器將記帳 app 向上掃走，再由主畫面打開，會直接返到「卡與渠道」呢頁，資料唔會唔見。</div>
   </div>
   <div class="card"><h3>設定自動收集（iPhone 捷徑）</h3>
     <div class="small muted">iOS 唔俾網頁讀短訊同通知，所以由捷徑嘅自動化轉交：收到付款通知或者銀行短訊時，捷徑將內容送去你嘅 Google 試算表，app 再讀返。以下用上面嘅安裝掣，大約 3 分鐘完成（需要 iOS 27 或以上）。</div>
     <details open><summary>① 安裝同開啟（第一次設定）</summary><ol class="steps">
       <li>先連接 Google 試算表（上面「Google 試算表」）。</li>
-      <li>撳<b>「① 複製試算表網址」</b>，再撳<b>「② 安裝『記帳送出』」</b>→ 捷徑 app 會問網址同密碼：網址貼上啱啱複製嗰條；密碼係你 Code.gs 第 7 行嘅 TOKEN。<b>唔好改「記帳送出」個名</b>。</li>
+      <li>撳<b>「① 複製試算表網址」</b>，再撳<b>「② 安裝『記帳送出』」</b>→ 捷徑 app 會問網址同密碼：網址貼上啱啱複製嗰條；密碼係你 Code.gs 第 7 行嘅 TOKEN。裝好後捷徑叫<b>「ledger-send」，唔好改名</b>。</li>
       <li>撳<b>「③ 記帳通知」</b>同需要嘅<b>「④–⑥ 記帳短訊」</b>逐個安裝。裝完返嚟方法見上面「裝完點返嚟」。</li>
       <li>打開捷徑 app 嘅<b>「自動化」</b>頁，將「記帳通知」同「記帳短訊」嘅<b>開關打開</b>（安裝後預設係關閉）。</li>
       <li>測試：用 Apple Pay／八達通付一筆小額，返嚟撳右上角「更新」，見到記錄就成功。</li></ol></details>
@@ -1288,7 +1359,7 @@ function renderCards(){
       <li>想同時收多個 app（例如 PayMe、BoC Pay、銀行 app）：長按「記帳通知」→「<b>複製</b>」，再將複製品嘅 app 改做另一個。</li>
       <li>家人部機冇嗰個 app 都唔會出錯，只係嗰個自動化唔會觸發。</li></ol></details>
     <details><summary>④ 手動建立（唔用安裝掣）</summary><ol class="steps">
-      <li>每個自動化只需要兩個動作：<b>「文字」</b>＋<b>「執行捷徑：記帳送出」</b>（輸入揀「文字」，關閉「執行時顯示」）。</li>
+      <li>每個自動化只需要兩個動作：<b>「文字」</b>＋<b>「執行捷徑：ledger-send」</b>（輸入揀「文字」，關閉「執行時顯示」）。</li>
       <li>收通知嘅「文字」：</li></ol>
       <div class="code" id="tpl-notif">notif || [目前日期] || [捷徑輸入]</div>
       <ol class="steps" start="3"><li>收短訊嘅「文字」（最後一格揀「捷徑輸入 → 內容」或者「內容」）：</li></ol>
@@ -1302,7 +1373,7 @@ function renderCards(){
       <li>「管理部署作業 → 編輯 → 新版本 → 部署」。之後每 5 分鐘會自動檢查一次；想即時檢查就撳 app 右上角「更新」。</li>
       <li>另一個電郵地址：喺嗰個信箱設定自動轉寄，將 PayMe、BoC Pay、轉數快嘅通知轉去呢個 Gmail 就得。</li>
       <li>想停：揀函數「stopMail」→ 執行。</li></ol></details>
-    <details><summary>⑥ 冇網絡時嘅後備（選擇性）</summary><ol class="steps"><li>喺「記帳送出」最後再加<b>「附加到文字檔案」</b>（內容揀「捷徑輸入」）→ 記帳/inbox.txt，開啟「建立新行」。</li><li>如果某次送唔到試算表，可以喺下面「從檔案匯入」揀返呢個檔補返，重複嘅行會自動略過。</li></ol></details>
+    <details><summary>⑥ 冇網絡時嘅後備（選擇性）</summary><ol class="steps"><li>喺「ledger-send」最後再加<b>「附加到文字檔案」</b>（內容揀「捷徑輸入」）→ 記帳/inbox.txt，開啟「建立新行」。</li><li>如果某次送唔到試算表，可以喺下面「從檔案匯入」揀返呢個檔補返，重複嘅行會自動略過。</li></ol></details>
     <details><summary>⑦ 加到主畫面</summary><ol class="steps"><li>用 Safari 打開 app 網址 → 分享 →<b>「加入主畫面」</b>。</li><li>連接咗試算表之後，資料以試算表為準，換機或者清咗 Safari 都可以重新連接攞返。</li></ol></details>
   </div>
   <div class="card"><h3>資料與私隱</h3>
@@ -1730,14 +1801,19 @@ document.addEventListener('click',e=>{
     else if(a==='sg-not'){t.type='transfer';delete t.linkMonth}
     else if(t.suggestTpl)delete t.linkMonth;
     delete t.suggestTpl;delete t.suggestBill;t.status='confirmed';save();render();toast(a==='sg-replace'?'已用實際金額取代':'已確認')}
+  else if(a==='mc-ok'||a==='mc-no'||a==='mc-white'||a==='mc-black'){const t=S.txns.find(x=>x.id===b.dataset.id);if(!t)return;const m=mailSender((t.raw||[])[0]);
+    if(a==='mc-ok'){t.status='confirmed';delete t.mailCheck;t.note='';save();render();toast('已確認係收入')}
+    else if(a==='mc-no'){S.txns=S.txns.filter(x=>x.id!==t.id);trashPut('txn',t,{reason:'唔係收入（電郵）'});save();render();toast('已移去垃圾筒')}
+    else setSender(m&&m.key,a==='mc-white'?'w':'b',m)}
+  else if(a==='ms-set'){setSender(b.dataset.k,b.dataset.st)}
   else if(a==='one-click'){let mg=0,kept=0;
     for(const rv of S.reviews.filter(x=>!x.resolved)){const A=S.txns.find(t=>t.id===rv.a),B=S.txns.find(t=>t.id===rv.b);if(!A||!B){rv.resolved=true;continue}
       const sa=A.sources||[A.source],sb=B.sources||[B.source];
       if(!sa.some(x=>sb.includes(x))){A.sources=[...new Set([...sa,...sb])];A.raw=[...(A.raw||[]),...(B.raw||[])];if(GENERIC_CH.has(A.channel||'')&&!GENERIC_CH.has(B.channel||''))A.channel=B.channel;if(GENERIC_MER.test(A.merchant||'')&&!GENERIC_MER.test(B.merchant||''))A.merchant=B.merchant;
         S.txns=S.txns.filter(t=>t.id!==B.id);trashPut('txn',B,{reason:'一鍵核實：重複通知'});A.status='confirmed';rv.resolved=true;mg++}else kept++}
-    const open=new Set(S.reviews.filter(r=>!r.resolved).flatMap(r=>[r.a,r.b]));let n=0;S.txns.forEach(t=>{if(t.status!=='confirmed'&&!open.has(t.id)&&!t.suggestTpl&&!t.suggestBill){t.status='confirmed';n++}});
+    const open=new Set(S.reviews.filter(r=>!r.resolved).flatMap(r=>[r.a,r.b]));let n=0;S.txns.forEach(t=>{if(t.status!=='confirmed'&&!open.has(t.id)&&!t.suggestTpl&&!t.suggestBill&&!t.mailCheck){t.status='confirmed';n++}});
     save();render();toast(`已合併 ${mg} 組重複通知 · 確認 ${n} 筆${kept?` · ${kept} 組同一來源重複，留俾你決定`:''}`)}
-  else if(a==='confirm-all'){const open=new Set(S.reviews.filter(r=>!r.resolved).flatMap(r=>[r.a,r.b]));let n=0;S.txns.forEach(t=>{if(t.status!=='confirmed'&&!open.has(t.id)){t.status='confirmed';n++}});save();render();toast(`已確認 ${n} 筆`)}
+  else if(a==='confirm-all'){const open=new Set(S.reviews.filter(r=>!r.resolved).flatMap(r=>[r.a,r.b]));let n=0;S.txns.forEach(t=>{if(t.status!=='confirmed'&&!open.has(t.id)&&!t.mailCheck&&!t.suggestTpl&&!t.suggestBill){t.status='confirmed';n++}});save();render();toast(`已確認 ${n} 筆`)}
   else if(a==='ana-mode'){ui.ana.mode=b.dataset.mode;render()}
   else if(a==='ana-prev'||a==='ana-next'){ui.ana.anchor=shift(ui.ana.mode,ui.ana.anchor,a==='ana-prev'?-1:1);render()}
   else if(a==='ana-cat'){ui.ana.cat=b.dataset.cat||null;render();if(ui.ana.cat)setTimeout(()=>{const c=document.querySelectorAll('#tab-analysis .card');c[c.length-1].scrollIntoView({behavior:'smooth',block:'start'})},30)}
@@ -1776,7 +1852,7 @@ function render(){
   updateBadge();
   $('#btn-hide').textContent=S.settings.hideIncome?'顯示收入':'隱藏收入';
 }
-{const n=cleanBlockedMail();if(n){save();setTimeout(()=>toast(`已清走 ${n} 筆推廣電郵記錄（喺垃圾筒可以還原）`),400)}}
+{collectSenders();const n=cleanBlockedMail(),q=pendMailIncome();save();if(n||q)setTimeout(()=>toast([n?`已清走 ${n} 筆推廣電郵記錄（喺垃圾筒可以還原）`:'',q?`${q} 筆電郵收入改咗做待核實`:''].filter(Boolean).join(' · ')),400)}
 refreshStatuses();render();
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 setInterval(()=>{if(document.hidden)return;refreshStatuses();if(CONN)syncPull(false);else softRender()},60000);
