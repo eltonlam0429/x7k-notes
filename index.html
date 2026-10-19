@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.18-48';
+const APP_VERSION='2026.10.18-49';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -784,7 +784,9 @@ function parseBankMail(text){
   const isCard=/(信用卡交易通知|credit card transaction|card transaction|簽賬通知|信用卡.{0,12}(簽賬|交易|消費))/i.test(core);
   const isDD=/(直接付款授權|direct debit|edda|直接扣賬)/i.test(t);
   // 銀行付款通知：有「付款／轉賬金額」同「受款人／收款人」，即使冇寫明直接付款授權都當係由戶口付款
-  const isPay=/(付款金額|轉賬金額|轉帳金額|扣賬金額|payment amount|debit amount)/i.test(t)&&/(受款人|收款人|收款方|payee|beneficiary)/i.test(t);
+  // 銀行轉賬通知（例如恒生「Transfer Amount 轉賬金額」）：就算冇寫收款人都當係轉賬
+  const isXfer=/(轉賬金額|轉帳金額|transfer amount)/i.test(t);
+  const isPay=isXfer||(/(付款金額|扣賬金額|payment amount|debit amount)/i.test(t)&&/(受款人|收款人|收款方|payee|beneficiary)/i.test(t));
   if(!isCard&&!isDD&&!isPay)return null;
   if(/(設立|建立|成功登記|登記成功|set ?up|registration|取消|cancel|修改)/i.test(t)&&!/(已轉賬|已轉帳|已扣|debited|charged|交易金額|付款金額|轉賬金額|轉帳金額|transaction amount)/i.test(t))return{skip:true};
   const parts=core.split(/\s*¦\s*/).filter(x=>!/(可用|信用額|額度|credit limit|available|結餘|balance|上限|最低還款|minimum payment|到期)/i.test(x));
@@ -793,11 +795,15 @@ function parseBankMail(text){
   const amount=num(am[1]||am[2]);if(!(amount>0))return{skip:true};
   const MP=[/(?:商戶|商號|商店|merchant)\s*(?:名稱|name)?\s*[:：]\s*([^¦,，。;]+)/i,/(?:受款人|收款人|收款方|收款戶口名稱|payee|beneficiary|receiver)\s*(?:名稱|name)?\s*[:：]?\s*([^¦,，。;]+)/i,/(?:在|於)\s*([^¦，,。\d\s][^¦，,。]*?)\s*(?:簽賬|消費|進行|交易)/,/\bat\s+([A-Z0-9*][^¦,;]*?)(?:\s+on\s|\s+for\s|\s*[¦,;]|\.\s|$)/i,/(?:轉賬至|轉帳至|轉賬予|轉帳予|付款予|付款至|轉賬給|轉帳給|to)\s+([^¦,，。;]+?)(?:\s+on\s|[¦,，。;]|$)/i];
   let merchant='';for(const p of MP){const m=body.match(p);if(m&&m[1].trim()&&!/^(HKD|HK\$|\$|港元)/i.test(m[1].trim())){merchant=m[1].trim();break}}
-  merchant=merchant.replace(/(?:HKD|HK\$|\$|港元|港幣)\s*[\d,.]+/ig,'').replace(/\s+on\s+\d.*$/i,'').trim().slice(0,48);
+  merchant=merchant.replace(/^(?:[\s:：]*(?:收款人|受款人|收款方|付款人|payee|beneficiary)?\s*(?:名稱|name)\s*[:：]\s*)+/i,'').replace(/(?:HKD|HK\$|\$|港元|港幣)\s*[\d,.]+/ig,'').replace(/\s+on\s+\d.*$/i,'').trim().slice(0,48);
   const l4=body.match(/(?:尾號|末四位|ending(?: in| with)?|card(?: number| no\.?)?(?: ending)?)[^\d]{0,14}(\d{4})/i)||body.match(/[*xX•]{2,}[\s-]?(\d{4})/);
   let type=/(退款|refund|reversal|credit adjustment|退回)/i.test(body)?'refund':'expense';
   let channel;
-  if(isDD||(isPay&&!isCard)){channel=isDD||/(戶口|account)/i.test(body)?'autopay':'bank';if(WALLET_RE.test(merchant||body))type='transfer';if(!merchant)merchant=isDD?'直接付款授權':'銀行付款'}
+  // 轉入（有人轉錢俾你）：當收入，交返 routeIncome 處理（電郵收入要核實）
+  if(isPay&&!isCard&&!isDD&&/(存入|轉入|收到|已收|入賬|入帳|credited|received|deposit)/i.test(body)&&!/(轉出|扣除|扣賬|debited|轉賬至|轉帳至|transfer(?:red)? to)/i.test(body)){
+    const fromM=body.replace(/^\s*From:[^¦]*¦?/i,'').match(/(?:付款人|匯款人|轉賬人|轉帳人|from|payer|remitter)\s*(?:名稱|name)?\s*[:：]?\s*([^¦,，。;]+)/i);
+    return{amount,merchant:fromM?`轉賬 · 由 ${fromM[1].replace(/^[\s:：]*(?:付款人|匯款人|payer|remitter)?\s*(?:名稱|name)?\s*[:：]\s*/i,'').trim().slice(0,40)}`:'銀行轉賬收款',channel:'bank',type:'income'}}
+  if(isDD||(isPay&&!isCard)){channel=isDD||/(戶口|account)/i.test(body)?'autopay':'bank';if(WALLET_RE.test(merchant||body))type='transfer';if(!merchant)merchant=isDD?'直接付款授權':isXfer?'銀行轉賬':'銀行付款'}
   else{let c=l4?matchCard(l4[1]):matchCard(body);if(!c&&l4)c=ensureCard('尾號 '+l4[1],'credit'),c.keywords=[l4[1]];channel=c?c.id:'credit';
     if(c&&c.collect===false)return{skip:true};
     if(/payme|增值|top.?up|充值/i.test(merchant))type='transfer';if(!merchant)merchant='信用卡簽賬'}
@@ -938,7 +944,7 @@ function importText(text,opts={}){
       const ts=parseTime(r.parts[1])||fmtLocal(new Date());
       if(src==='mail'&&mailBlocked(r.line)){res.skipped++;continue}
       if(src==='mail'){const bk=parseBankMail(r.parts.slice(2).join(' ¦ '));
-        if(bk){if(bk.skip){res.skipped++;continue}S.imported[h]=1;ingest({ts,amount:bk.amount,merchant:bk.merchant,channel:bk.channel,type:bk.type,source:'mail'},r.line,res);continue}}
+        if(bk){if(bk.skip){res.skipped++;continue}S.imported[h]=1;if(bk.type==='income'){routeIncome({ts,amount:bk.amount,name:bk.merchant,src:'mail',raw:r.line},res,r.line);continue}ingest({ts,amount:bk.amount,merchant:bk.merchant,channel:bk.channel,type:bk.type,source:'mail'},r.line,res);continue}}
       const items=parseNotifs(r.parts.slice(2).join(' ¦ '),src==='mail');
       if(src==='notif'&&handleOctoBalance(r.parts.slice(2).join(' ¦ '),ts,r.line,res)){S.imported[h]=1;continue}
       if(!items.length){
