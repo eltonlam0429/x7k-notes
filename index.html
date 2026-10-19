@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.18-41';
+const APP_VERSION='2026.10.18-42';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -279,8 +279,13 @@ const CATS=[
  {k:'住屋',c:'#8C6D4F',kw:['租金','交租','rent','ikea','宜家','傢俬','裝修','日本城','japan home']},
  {k:'超市日用',c:'#3A9E6E',kw:['parknshop','百佳','wellcome','惠康','7-eleven','7-11','711','ok便利店','circle k','aeon','永旺','街市','買餸','餸','菜','肉','生果','超市','market','759','大昌','日用','紙巾','便利店']},
  {k:'餐飲',c:'#E07A3F',kw:['cafe de coral','大家樂','maxim','美心','mcdonald','麥當勞','kfc','肯德基','starbucks','星巴克','pacific coffee','吉野家','yoshinoya','譚仔','tamjai','大快活','fairwood','茶餐廳','restaurant','餐廳','cafe','coffee','咖啡','早餐','午餐','晏晝','晚餐','晚飯','宵夜','食','飯','麵','茶','飲','deliveroo','foodpanda','keeta','壽司','sushi','pizza','burger','酒樓','點心','奶茶','甜品','bakery','麵包','lunch','dinner','breakfast']},
+ {k:'指定',c:'#B0413E',kw:[]},
  {k:'其他',c:'#8A93A6',kw:[]}
 ];
+// 卡嘅「指定店鋪」：交易嘅商戶包含呢啲字（唔理空格大細楷）就算符合
+const desigList=c=>String((c&&c.desig)||'').split(/[,，、\n]/).map(x=>x.trim()).filter(Boolean);
+function desigHit(t){const c=S.cards.find(x=>x.id===t.channel);if(!c)return null;const m=String(t.merchant||'').toLowerCase().replace(/\s+/g,'');if(!m)return null;
+  const w=desigList(c).find(k=>m.includes(k.toLowerCase().replace(/\s+/g,'')));return w?{card:c,word:w}:null}
 const CAT_NAMES=CATS.map(c=>c.k);
 const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 CATS.forEach(c=>{c.tests=c.kw.map(w=>/^[a-z0-9&'\-. ]+$/.test(w)&&w.length<=4?(t=>new RegExp('(^|[^a-z0-9])'+escRe(w)+'([^a-z0-9]|$)').test(t)):(t=>t.includes(w)))});
@@ -757,7 +762,7 @@ function ingest(t,rawLine,res){
     if(c.status!=='confirmed')c.status=c.category==='其他'?'pending':'confirmed';
     res.merged++;
   }else{
-    const nt={id:uid(),note:'',...t,category:categorize(t.merchant),status:(t.type==='transfer'||t.type==='void')?'confirmed':(both&&(Date.now()-toDate(t.ts))/36e5<S.settings.mergeHours?'processing':'pending'),sources:[t.source]};
+    const nt={id:uid(),note:'',...t,category:(()=>{const h=desigHit(t);return h&&h.card.desigAuto?'指定':categorize(t.merchant)})(),status:(t.type==='transfer'||t.type==='void')?'confirmed':(both&&(Date.now()-toDate(t.ts))/36e5<S.settings.mergeHours?'processing':'pending'),sources:[t.source]};
     const mb=matchBill(nt);
     if(mb){if(Math.abs(mb.expected-nt.amount)<0.005){nt.linkBill={bid:mb.b.id,key:mb.key};nt.status='confirmed';nt.note='對應定期支出，金額一樣，已自動確認'}else{nt.suggestBill={bid:mb.b.id,key:mb.key};nt.status='pending'}}
     S.txns.push(nt);res.added++;
@@ -1530,7 +1535,7 @@ function renderAnalysis(){
   </div>
   <details class="card"><summary style="cursor:pointer"><b>分類關鍵字</b> <span class="small muted">（撳開設定）</span></summary>
     <div class="small muted" style="margin:6px 0">商戶名包含呢啲字就自動歸入該分類，用逗號分隔。唔理空格同大細楷：填「food panda」都會認到「foodpanda」。你填嘅字眼優先過內置判斷；你手動改過分類嘅商戶會記住，唔受影響。</div>
-    ${CATS.filter(c=>c.k!=='其他').map(c=>`<label class="field"><span><span class="cat-chip" style="--cc:${c.c};font-weight:600">${esc(c.k)}</span></span><input data-ckw="${esc(c.k)}" value="${esc(((S.settings.catKw||{})[c.k])||'')}" placeholder="例如：${esc(c.kw.slice(0,3).join(', '))}" autocapitalize="off" autocorrect="off"></label>`).join('')}
+    ${CATS.filter(c=>c.k!=='其他').map(c=>`<label class="field"><span><span class="cat-chip" style="--cc:${c.c};font-weight:600">${esc(c.k)}</span></span><input data-ckw="${esc(c.k)}" value="${esc(((S.settings.catKw||{})[c.k])||'')}" placeholder="例如：${esc(c.kw.length?c.kw.slice(0,3).join(', '):'店鋪名')}" autocapitalize="off" autocorrect="off"></label>`).join('')}
   </details>${detail}`;
   document.querySelectorAll('[data-ckw]').forEach(i=>i.onchange=()=>{
     S.settings.catKw=S.settings.catKw||{};const v=i.value.trim();if(v)S.settings.catKw[i.dataset.ckw]=v;else delete S.settings.catKw[i.dataset.ckw];
@@ -1616,6 +1621,7 @@ function openEditTx(id){
     <div class="field"><span>日期（日子可以唔揀）</span>${dateFields('f-date',t.noDay?t.ts.slice(0,7):t.ts.slice(0,10))}</div>
     <label class="field"><span>商戶 / 描述</span><input id="f-mer" value="${esc(t.merchant)}"></label>
     <div class="row2"><label class="field"><span>分類</span><select id="f-cat">${catOptions(t.category)}</select></label><label class="field"><span>付款渠道</span><select id="f-ch">${chOptions(t.channel)}</select></label></div>
+    ${(()=>{const c=S.cards.find(x=>x.id===t.channel);const L=desigList(c);if(!L.length)return'';const h=desigHit(t);return`<div class="small ${h&&t.category!=='指定'?'':'muted'}" style="${h&&t.category!=='指定'?'color:var(--red)':''}">「${esc(c.name)}」指定店鋪：${esc(L.join('、'))}${h?(t.category==='指定'?' · ✓ 已歸類為指定':` · 呢筆符合「${esc(h.word)}」，可以將分類改做「指定」`):''}</div>`})()}
     <label class="check"><input type="checkbox" id="f-rule"><span>以後同一商戶都自動用呢個分類</span></label>
     <div class="row2"><label class="field"><span>類型</span><select id="f-type">${Object.entries(TYPE_L).map(([k,v])=>`<option value="${k}" ${t.type===k?'selected':''}>${v}</option>`).join('')}</select></label><label class="field"><span>狀態</span><select id="f-st">${Object.entries(ST_L).map(([k,v])=>`<option value="${k}" ${(unconf?'confirmed':t.status)===k?'selected':''}>${v}</option>`).join('')}</select></label></div>
     <div id="f-inc-w" class="stack" ${t.type==='income'?'':'hidden'}><label class="field"><span>對應收入設定（揀咗就會用呢筆實際金額取代 ${+pm.slice(5)} 月嗰筆）</span><select id="f-tpl">${tplOpts(t.linkTpl||t.suggestTpl||'')}</select></label></div>
@@ -1828,6 +1834,9 @@ function openCard(id){
       <div class="row2"><label class="field"><span>自動增值</span><select id="o-on"><option value="1" ${A.on?'selected':''}>有</option><option value="0" ${A.on?'':'selected'}>冇</option></select></label><label class="field"><span>每次自動增值金額（HK$）</span><input id="o-amt" inputmode="decimal" value="${esc(A.amt)}" ${A.on?'':'disabled'}></label></div>
       <div class="row2"><label class="field"><span>八達通消費預設分類</span><select id="o-cat">${catOptions(A.cat)}</select></label><label class="field"><span>目前餘額（可修正起點）</span><input id="o-bal" inputmode="decimal" value="${d.octoBal?esc(d.octoBal.bal):''}" placeholder="等第一個通知"></label></div>`})():''}
       <h3 style="margin-top:6px">回贈</h3>
+      <label class="field"><span>指定店鋪（呢張卡有額外回贈嘅商戶，用逗號分隔）</span><textarea id="c-desig" rows="2" placeholder="例如：Apple, 大家樂, HKTVmall" style="width:100%">${esc(d.desig||'')}</textarea></label>
+      <label class="li" style="gap:10px;padding:4px 0"><span class="grow small">用呢張卡喺指定店鋪簽賬，自動歸類為「指定」（唔開就只會提示，由你自己改）</span><span class="switch"><input type="checkbox" id="c-desig-auto" ${d.desigAuto?'checked':''}><span></span></span></label>
+      <div class="small faint">喺下面「按分類」規則揀「指定」，就可以為指定店鋪設定回贈 % 同上限。</div>
       <div class="row2"><label class="field"><span>回贈版本</span><select id="rv-sel">${d.rebates.map((v,i)=>`<option value="${i}" ${i===vi?'selected':''}>${v.from<='2000-01'?'最早嘅設定':`由 ${v.from.slice(5)}/${v.from.slice(0,4)} 起`}</option>`).join('')}<option value="new">＋ 新回贈（例如每年轉）</option></select></label>
       <div class="field"><span>${vi===0?'適用月份':'由幾時開始計（MM/YYYY，可追溯）'}</span>${vi===0?'<div class="small muted" style="padding-top:10px">之前所有月份</div>':`<div class="datef two"><select id="rv-m" aria-label="月">${Array.from({length:12},(_,i)=>`<option value="${i+1}" ${+R.from.slice(5)===i+1?'selected':''}>${pad(i+1)} 月</option>`).join('')}</select><select id="rv-y" aria-label="年">${Array.from({length:8},(_,i)=>new Date().getFullYear()-5+i).map(y=>`<option ${+R.from.slice(0,4)===y?'selected':''}>${y}</option>`).join('')}</select></div>`}</div></div>
       <div class="small faint">每個回贈設定都係無限期，直至下一個版本開始。${d.rebates.length>1&&vi>0?'<button class="btn sm danger" type="button" id="rv-del" style="margin-left:6px">刪除呢個版本</button>':''}</div>
@@ -1849,7 +1858,7 @@ function openCard(id){
       <div class="err" id="c-err" hidden></div>
       <div class="actions"><button class="btn" type="button" id="c-save">儲存</button>${isNew?'':'<button class="btn danger" type="button" id="c-del">刪除卡</button>'}</div>`,()=>{
         const val=q=>{const e=document.querySelector(q);return e?e.value.trim():''};
-        const grab=()=>{if($('#rv-m'))R.from=`${$('#rv-y').value}-${pad($('#rv-m').value)}`;if($('#o-on')){const A=octoDefaults(d);A.on=$('#o-on').value==='1';A.amt=num($('#o-amt').value)||0;A.cat=$('#o-cat').value;const b=$('#o-bal').value.trim();if(b!==''&&!isNaN(num(b))&&(!d.octoBal||num(b)!==d.octoBal.bal))d.octoBal={bal:num(b),ts:fmtLocal(new Date())}}R.resetDay=+$('#c-reset').value||1;if($('#c-per')){R.capPeriod=$('#c-per').value;if($('#c-ys'))R.yearStart=+$('#c-ys').value||1}if($('#c-stmt')){d.stmtDay=+$('#c-stmt').value||null;d.stmtRule=$('#c-srule').value;if($('#c-due')){d.dueDay=+$('#c-due').value||null;d.dueMonth=$('#c-duem').value}}d.name=$('#c-name').value;d.type=$('#c-type').value;d.collect=$('#c-col').checked;d.keywords=$('#c-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);if($('#c-pref'))d.l4Pref=$('#c-pref').checked;
+        const grab=()=>{if($('#rv-m'))R.from=`${$('#rv-y').value}-${pad($('#rv-m').value)}`;if($('#o-on')){const A=octoDefaults(d);A.on=$('#o-on').value==='1';A.amt=num($('#o-amt').value)||0;A.cat=$('#o-cat').value;const b=$('#o-bal').value.trim();if(b!==''&&!isNaN(num(b))&&(!d.octoBal||num(b)!==d.octoBal.bal))d.octoBal={bal:num(b),ts:fmtLocal(new Date())}}R.resetDay=+$('#c-reset').value||1;if($('#c-desig')){d.desig=$('#c-desig').value.trim();d.desigAuto=$('#c-desig-auto').checked}if($('#c-per')){R.capPeriod=$('#c-per').value;if($('#c-ys'))R.yearStart=+$('#c-ys').value||1}if($('#c-stmt')){d.stmtDay=+$('#c-stmt').value||null;d.stmtRule=$('#c-srule').value;if($('#c-due')){d.dueDay=+$('#c-due').value||null;d.dueMonth=$('#c-duem').value}}d.name=$('#c-name').value;d.type=$('#c-type').value;d.collect=$('#c-col').checked;d.keywords=$('#c-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);if($('#c-pref'))d.l4Pref=$('#c-pref').checked;
           if(R.mode==='tier')R.tiers.forEach((t,i)=>{const l=val(`[data-tl="${i}"]`);t.limit=l===''?'':num(l);t.pct=num(val(`[data-tp="${i}"]`))||0});
           else if(R.mode==='split'){R.basePct=num(val('#c-base'))||0;R.extraPct=num(val('#c-extra'))||0;const c=val('#c-cap');R.extraCap=c===''?'':num(c)}
           else{R.basePct=num(val('#c-base'))||0;R.catRules.forEach((r,i)=>{r.pct=num(val(`[data-rp="${i}"]`))||0;const c=val(`[data-rcap="${i}"]`);r.cap=c===''?'':num(c)})}};
@@ -1883,8 +1892,8 @@ function catCheckList(c){const cy=rebateCycle(c);return catDependent(c)?ALL.filt
 function openCatCheck(id){
   const c=S.cards.find(x=>x.id===id);if(!c)return;const m=curMonth();
   const draw=()=>{rebuild();const list=catCheckList(c,m);
-    openSheet(`核對分類 · ${c.name}`,`<div class="small muted">呢張卡嘅回贈按分類計。以下交易嘅分類係自動判斷，請確認或者改正，回贈先會計得準。</div>
-      ${list.length?`<div class="list">${list.map(t=>`<div class="li" style="flex-wrap:wrap"><span class="grow"><span class="t" style="display:block">${esc(t.merchant)}</span><span class="m">${t.noDay?'未指定日子':`${+t.ts.slice(5,7)}/${+t.ts.slice(8,10)} ${t.ts.slice(11,16)}`} · ${money(t.amount)}</span></span><select data-cc="${esc(t.id)}" aria-label="分類">${catOptions(t.category)}</select><button class="btn sm ghost" type="button" data-ok="${esc(t.id)}">啱</button></div>`).join('')}</div>
+    openSheet(`核對分類 · ${c.name}`,`<div class="small muted">呢張卡嘅回贈按分類計。以下交易嘅分類係自動判斷，請確認或者改正，回贈先會計得準。</div>${desigList(c).length?`<div class="small muted">指定店鋪：${esc(desigList(c).join('、'))}（標咗「指定店鋪？」嘅可以改做「指定」）</div>`:''}
+      ${list.length?`<div class="list">${list.map(t=>`<div class="li" style="flex-wrap:wrap"><span class="grow"><span class="t" style="display:block">${esc(t.merchant)}${desigHit(t)&&t.category!=='指定'?' <span class="badge" style="color:var(--red)">指定店鋪？</span>':''}</span><span class="m">${t.noDay?'未指定日子':`${+t.ts.slice(5,7)}/${+t.ts.slice(8,10)} ${t.ts.slice(11,16)}`} · ${money(t.amount)}</span></span><select data-cc="${esc(t.id)}" aria-label="分類">${catOptions(t.category)}</select><button class="btn sm ghost" type="button" data-ok="${esc(t.id)}">啱</button></div>`).join('')}</div>
       <div class="actions"><button class="btn" type="button" id="cc-all">全部確認（${list.length} 筆）</button></div>`:'<div class="empty">全部已核對，回贈已按分類計好。</div>'}`,()=>{
         document.querySelectorAll('[data-cc]').forEach(sel=>sel.onchange=()=>{const t=S.txns.find(x=>x.id===sel.dataset.cc);if(t){t.category=sel.value;t.catChecked=true;save();draw();toast('已改分類')}});
         document.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>{const t=S.txns.find(x=>x.id===b.dataset.ok);if(t){t.catChecked=true;save();draw()}});
