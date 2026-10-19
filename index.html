@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.18-44';
+const APP_VERSION='2026.10.18-45';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1064,7 +1064,9 @@ function calcRebate(card,txs,Rv){
       const ri=rules.findIndex(r=>(r.cats||[]).includes(t.category));
       if(ri<0){base+=t.amount*(+R.basePct||0)/100;return}
       const r=rules[ri],p=pool[ri],cap=capOf(ri);const inCap=Math.min(Math.max(0,cap-pu[p]),t.amount);
-      pu[p]+=t.amount;r.used+=t.amount;extra+=inCap*(+r.pct||0)/100;base+=(t.amount-inCap)*(+R.basePct||0)/100;
+      pu[p]+=t.amount;r.used+=t.amount;extra+=inCap*(+r.pct||0)/100;
+      // 超出上限：有填「超出上限後 %」就用佢，否則用基本回贈
+      const over=t.amount-inCap;if(r.overPct!==''&&r.overPct!=null)extra+=over*(+r.overPct||0)/100;else base+=over*(+R.basePct||0)/100;
     });
     const heads=rules.map((r,i)=>i).filter(i=>pool[i]===i);
     return{spend,total:r2(base+extra),base:r2(base),extra:r2(extra),rules:heads.map(h=>{const cap=capOf(h);const cats=[...new Set(rules.filter((r,i)=>pool[i]===h).flatMap(r=>r.cats||[]))];return{cats,pct:rules[h].pct,used:r2(pu[h]),left:cap===Infinity?null:r2(Math.max(0,cap-pu[h]))}}),capLeft:null,capUsedPct:null};
@@ -1866,7 +1868,7 @@ function openCard(id){
         <div class="field"><span>額外回贈只限以下分類（唔揀 ＝ 全部）</span>${chips(R.extraCats,c=>`data-ec="${esc(c)}"`)}</div>`
       :`<div class="small muted">唔同分類有唔同回贈，例如餐飲 4%、衣服零售 5%。超出上限或者唔屬於任何規則嘅交易，用基本回贈計。分類由 app 自動判斷，計回贈前會叫你核對。</div>
         <label class="field"><span>基本回贈 %（其他交易）</span><input id="c-base" inputmode="decimal" value="${esc(R.basePct)}"></label>
-        ${R.catRules.map((r,i)=>`<div class="review"><div class="card-head"><b>規則 ${i+1}</b><button class="icon-btn" type="button" data-rr="${i}" aria-label="移除規則 ${i+1}">✕</button></div>${chips(r.cats||[],c=>`data-rc="${i}" data-c="${esc(c)}"`)}${i>0?`<label class="li" style="gap:10px;padding:6px 0"><span class="grow small">同上一條規則合併計算簽賬上限（例如全年合共 $100,000）</span><span class="switch"><input type="checkbox" data-rsh="${i}" ${r.share?'checked':''}><span></span></span></label>`:''}<div class="row2"><label class="field"><span>回贈 %</span><input data-rp="${i}" inputmode="decimal" value="${esc(r.pct)}"></label>${i>0&&r.share?`<div class="field"><span>簽賬上限</span><div class="small muted" style="padding-top:10px">同規則 ${(()=>{let h=i;while(h>0&&R.catRules[h].share)h--;return h+1})()} 合併計算</div></div>`:`<label class="field"><span>${R.capPeriod==='year'?'每年':'每月'}簽賬上限（留空 ＝ 無）${R.catRules.some((x,j)=>j>i&&x.share)?'・合併上限':''}</span><input data-rcap="${i}" inputmode="decimal" value="${esc(r.cap??'')}"></label>`}</div></div>`).join('')}
+        ${R.catRules.map((r,i)=>`<div class="review"><div class="card-head"><b>規則 ${i+1}</b><button class="icon-btn" type="button" data-rr="${i}" aria-label="移除規則 ${i+1}">✕</button></div>${chips(r.cats||[],c=>`data-rc="${i}" data-c="${esc(c)}"`)}${i>0?`<label class="li" style="gap:10px;padding:6px 0"><span class="grow small">同上一條規則合併計算簽賬上限（例如全年合共 $100,000）</span><span class="switch"><input type="checkbox" data-rsh="${i}" ${r.share?'checked':''}><span></span></span></label>`:''}<div class="row2"><label class="field"><span>上限內回贈 %</span><input data-rp="${i}" inputmode="decimal" value="${esc(r.pct)}"></label>${i>0&&r.share?`<div class="field"><span>簽賬上限</span><div class="small muted" style="padding-top:10px">同規則 ${(()=>{let h=i;while(h>0&&R.catRules[h].share)h--;return h+1})()} 合併計算</div></div>`:`<label class="field"><span>${R.capPeriod==='year'?'每年':'每月'}簽賬上限（留空 ＝ 無）${R.catRules.some((x,j)=>j>i&&x.share)?'・合併上限':''}</span><input data-rcap="${i}" inputmode="decimal" value="${esc(r.cap??'')}"></label>`}</div><label class="field"><span>超出上限後回贈 %（留空 ＝ 用基本回贈）</span><input data-rop="${i}" inputmode="decimal" value="${esc(r.overPct??'')}" placeholder="基本回贈 ${esc(R.basePct||0)}%"></label></div>`).join('')}
         <button class="btn sm line" type="button" id="c-addrule">＋ 加一條分類規則</button>`}
       <div class="err" id="c-err" hidden></div>
       <div class="actions"><button class="btn" type="button" id="c-save">儲存</button>${isNew?'':'<button class="btn danger" type="button" id="c-del">刪除卡</button>'}</div>`,()=>{
@@ -1874,7 +1876,7 @@ function openCard(id){
         const grab=()=>{if($('#rv-m'))R.from=`${$('#rv-y').value}-${pad($('#rv-m').value)}`;if($('#o-on')){const A=octoDefaults(d);A.on=$('#o-on').value==='1';A.amt=num($('#o-amt').value)||0;A.cat=$('#o-cat').value;const b=$('#o-bal').value.trim();if(b!==''&&!isNaN(num(b))&&(!d.octoBal||num(b)!==d.octoBal.bal))d.octoBal={bal:num(b),ts:fmtLocal(new Date())}}R.resetDay=+$('#c-reset').value||1;if($('#c-desig')){DESIG.forEach(([,f])=>{d[f]=$('#c-'+f).value.trim()});d.desigAuto=$('#c-desig-auto').checked}if($('#c-per')){R.capPeriod=$('#c-per').value;if($('#c-ys'))R.yearStart=+$('#c-ys').value||1}if($('#c-fee')){d.feeFree=$('#c-fee').value!=='pay';if($('#c-feem'))d.feeMonth=+$('#c-feem').value||null}if($('#c-stmt')){d.stmtDay=+$('#c-stmt').value||null;d.stmtRule=$('#c-srule').value;if($('#c-due')){d.dueDay=+$('#c-due').value||null;d.dueMonth=$('#c-duem').value}}d.name=$('#c-name').value;d.type=$('#c-type').value;d.collect=$('#c-col').checked;d.keywords=$('#c-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);if($('#c-pref'))d.l4Pref=$('#c-pref').checked;
           if(R.mode==='tier')R.tiers.forEach((t,i)=>{const l=val(`[data-tl="${i}"]`);t.limit=l===''?'':num(l);t.pct=num(val(`[data-tp="${i}"]`))||0});
           else if(R.mode==='split'){R.basePct=num(val('#c-base'))||0;R.extraPct=num(val('#c-extra'))||0;const c=val('#c-cap');R.extraCap=c===''?'':num(c)}
-          else{R.basePct=num(val('#c-base'))||0;R.catRules.forEach((r,i)=>{r.pct=num(val(`[data-rp="${i}"]`))||0;const c=val(`[data-rcap="${i}"]`);r.cap=c===''?'':num(c)})}};
+          else{R.basePct=num(val('#c-base'))||0;R.catRules.forEach((r,i)=>{r.pct=num(val(`[data-rp="${i}"]`))||0;const c=val(`[data-rcap="${i}"]`);r.cap=c===''?'':num(c);const o=val(`[data-rop="${i}"]`);r.overPct=o===''?'':num(o)})}};
         {const sr=$('#c-srule');if(sr)sr.onchange=()=>{grab();draw()}}
         {const fe=$('#c-fee');if(fe)fe.onchange=()=>{grab();draw()}}
         $('#c-per').onchange=()=>{grab();if(R.capPeriod==='year'&&!R.yearStart)R.yearStart=1;draw()};
