@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.18-46';
+const APP_VERSION='2026.10.18-47';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -822,11 +822,9 @@ function handleOctoBalance(text,ts,line,res){
     S.txns.push({id:uid(),ts,amount:r2(amount),merchant,category:cat||categorize(merchant),channel:oc.id,type,status:'confirmed',source:'notif',sources:['notif'],raw:[line],note,catChecked:true});res.added++};
   const diff=r2(prev.bal-bal);
   if(diff>0)mk('expense',diff,'八達通消費',`由餘額計算：$${prev.bal} → $${bal}`,A.cat);
-  else if(diff<0){const inc=-diff;
-    if(A.on&&+A.amt>0&&prev.bal<=50&&inc<=+A.amt+0.004){
-      mk('transfer',+A.amt,'八達通自動增值',`由餘額計算：$${prev.bal} → $${bal}，推算自動增值 $${A.amt}`);
-      mk('expense',+A.amt-inc,'八達通消費',`由餘額計算：自動增值 $${A.amt} 後扣除 $${r2(+A.amt-inc)}`,A.cat);
-    }else mk('transfer',inc,'八達通增值',`由餘額計算：$${prev.bal} → $${bal}`);
+  // 餘額增加 ＝ 增值（自動增值、手動增值、交通津貼等），照實際增加金額記低，唔計支出／收入
+  else if(diff<0){const inc=-diff;const auto=A.on&&+A.amt>0&&Math.abs(inc-+A.amt)<0.005;
+    mk('transfer',inc,auto?'八達通自動增值':'八達通增值',`由餘額計算：$${prev.bal} → $${bal}（增加 $${r2(inc)}）${auto?'':'；可能係手動增值或交通津貼'}`);
   }
   return true;
 }
@@ -1458,7 +1456,7 @@ function renderCards(){
     <label class="field"><span>Apple Pay 同短訊合併時間範圍</span><select id="merge-h">${[2,6,12,24,48].map(h=>`<option value="${h}" ${S.settings.mergeHours===h?'selected':''}>${h} 小時內同金額就當係同一筆候選</option>`).join('')}</select></label>
   </div>
   <div class="card"><div class="card-head"><h3>我的卡（本期回贈）</h3><button class="btn sm ghost" type="button" data-act="add-card">＋ 新增卡</button></div>
-    <div class="list">${S.cards.length?S.cards.map(c=>{const cy=rebateCycle(c),r=calcRebate(c,cardSpend(c,cy),rebateAt(c,cy.s));return`<button class="li" type="button" data-act="edit-card" data-id="${esc(c.id)}" style="flex-wrap:wrap"><span class="grow"><span class="t" style="display:block">${esc(c.name)} <span class="badge">${TYPE_CARD[c.type]||c.type}</span>${c.collect===false?' <span class="badge">唔收集</span>':''}${c.auto?' <span class="badge">自動發現</span>':''}${sameL4(c).length?` <span class="badge">${c.l4Pref?'同尾號 · 優先':'同尾號'}</span>`:''}</span><span class="m">${c.type==='octopus'&&c.octoBal?`餘額 ${money(c.octoBal.bal)} · `:''}${cy.year?'本年度':'本期'} ${cy.label} · 簽賬 ${money(r.spend)} · 預計回贈 ${money(r.total)}${r.rules?r.rules.filter(x=>x.left!=null).map(x=>` · ${esc(x.cats.join('/'))}額度尚餘 ${money(x.left)}`).join(''):r.capLeft!=null?` · 高回贈額度尚餘 ${money(r.capLeft)}`:''}</span>${r.capUsedPct!=null?`<span class="progress" style="display:block;margin-top:6px"><i style="width:${r.capUsedPct}%"></i></span>`:''}${stmtHtml(c)}${feeHtml(c)}</span><span class="faint">›</span></button>${(()=>{const n=catCheckList(c,m).length;return n?`<button class="warn-chip" type="button" data-act="cat-check" data-id="${esc(c.id)}">⚠ ${n} 筆交易要核對分類（影響回贈）</button>`:''})()}`}).join(''):'<div class="empty">未有卡。匯入第一個 Apple Pay 通知或者短訊時會自動加入。</div>'}</div>
+    <div class="list">${S.cards.length?S.cards.map(c=>{const cy=rebateCycle(c),r=calcRebate(c,cardSpend(c,cy),rebateAt(c,cy.s));return`<button class="li" type="button" data-act="edit-card" data-id="${esc(c.id)}" style="flex-wrap:wrap"><span class="grow"><span class="t" style="display:block">${esc(c.name)} <span class="badge">${TYPE_CARD[c.type]||c.type}</span>${c.collect===false?' <span class="badge">唔收集</span>':''}${c.auto?' <span class="badge">自動發現</span>':''}${sameL4(c).length?` <span class="badge">${c.l4Pref?'同尾號 · 優先':'同尾號'}</span>`:''}</span><span class="m">${c.type==='octopus'&&c.octoBal?`餘額 ${money(c.octoBal.bal)} · `:''}${c.type==='octopus'?(()=>{const tu=S.txns.filter(t=>t.channel===c.id&&t.type==='transfer'&&/增值/.test(t.merchant||'')&&t.ts.startsWith(curMonth()));if(!tu.length)return'';const last=tu.reduce((a,b)=>a.ts>b.ts?a:b);return`本月增值 ${money(sum(tu))}（${tu.length} 次，最近 ${last.ts.slice(8,10)}/${last.ts.slice(5,7)} +${money(last.amount)}）· `})():''}${cy.year?'本年度':'本期'} ${cy.label} · 簽賬 ${money(r.spend)} · 預計回贈 ${money(r.total)}${r.rules?r.rules.filter(x=>x.left!=null).map(x=>` · ${esc(x.cats.join('/'))}額度尚餘 ${money(x.left)}`).join(''):r.capLeft!=null?` · 高回贈額度尚餘 ${money(r.capLeft)}`:''}</span>${r.capUsedPct!=null?`<span class="progress" style="display:block;margin-top:6px"><i style="width:${r.capUsedPct}%"></i></span>`:''}${stmtHtml(c)}${feeHtml(c)}</span><span class="faint">›</span></button>${(()=>{const n=catCheckList(c,m).length;return n?`<button class="warn-chip" type="button" data-act="cat-check" data-id="${esc(c.id)}">⚠ ${n} 筆交易要核對分類（影響回贈）</button>`:''})()}`}).join(''):'<div class="empty">未有卡。匯入第一個 Apple Pay 通知或者短訊時會自動加入。</div>'}</div>
   </div>
   <div class="card"><h3>安裝「記帳送出」捷徑</h3>
     <div class="small muted">所有自動化都經呢個捷徑送資料去試算表。安裝時 iPhone 會叫你填網址同密碼；密碼只會存喺捷徑入面，呢個 app 唔會經手亦唔會儲存。</div>
@@ -1847,8 +1845,8 @@ function openCard(id){
       :`<div class="small faint">中銀：截數日唔會順延（星期日都照截）；還款日 ＝ 截數日＋26 日，遇星期六、日或公眾假期順延到下一個工作天。</div>`}
       <div class="small faint">截數日同還款日只係估算，可能同實際差幾日；計唔準時寧願估早啲。預計還款 ＝ 上期截數日之後到今期截數日（包括當日）嘅簽賬減退款。</div>`})():''}
       ${d.type==='octopus'?(()=>{const A=octoDefaults(d);return`<h3 style="margin-top:6px">八達通餘額計算</h3>
-      <div class="small muted">iPhone 收到「新餘額」通知時，會同上次餘額比較：減少 ＝ 支出，增加 ＝ 增值。</div>
-      <div class="row2"><label class="field"><span>自動增值</span><select id="o-on"><option value="1" ${A.on?'selected':''}>有</option><option value="0" ${A.on?'':'selected'}>冇</option></select></label><label class="field"><span>每次自動增值金額（HK$）</span><input id="o-amt" inputmode="decimal" value="${esc(A.amt)}" ${A.on?'':'disabled'}></label></div>
+      <div class="small muted">iPhone 收到「新餘額」通知時，會同上次餘額比較：減少 ＝ 支出；增加 ＝ 增值（自動增值、手動增值、交通津貼都係），照實際增加金額記低，唔計支出／收入，喺「我的卡」同記錄度顯示。</div>
+      <div class="row2"><label class="field"><span>自動增值</span><select id="o-on"><option value="1" ${A.on?'selected':''}>有</option><option value="0" ${A.on?'':'selected'}>冇</option></select></label><label class="field"><span>每次自動增值金額（HK$，只用嚟標示名稱）</span><input id="o-amt" inputmode="decimal" value="${esc(A.amt)}" ${A.on?'':'disabled'}></label></div>
       <div class="row2"><label class="field"><span>八達通消費預設分類</span><select id="o-cat">${catOptions(A.cat)}</select></label><label class="field"><span>目前餘額（可修正起點）</span><input id="o-bal" inputmode="decimal" value="${d.octoBal?esc(d.octoBal.bal):''}" placeholder="等第一個通知"></label></div>`})():''}
       <h3 style="margin-top:6px">回贈</h3>
       ${DESIG.map(([cat,f],i)=>`<label class="field"><span>${cat} 店鋪（用逗號分隔）</span><textarea id="c-${f}" rows="2" placeholder="${i===0?'例如：Apple, 大家樂, HKTVmall':'唔使用可以留空'}" style="width:100%;min-height:60px">${esc(d[f]||'')}</textarea></label>`).join('')}
