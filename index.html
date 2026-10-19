@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.18-45';
+const APP_VERSION='2026.10.18-46';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1067,6 +1067,8 @@ function calcRebate(card,txs,Rv){
       pu[p]+=t.amount;r.used+=t.amount;extra+=inCap*(+r.pct||0)/100;
       // 超出上限：有填「超出上限後 %」就用佢，否則用基本回贈
       const over=t.amount-inCap;if(r.overPct!==''&&r.overPct!=null)extra+=over*(+r.overPct||0)/100;else base+=over*(+R.basePct||0)/100;
+      // 疊加額外回贈：每層有自己嘅上限（只計呢條規則嘅簽賬），同上面獨立計
+      (r.extras||[]).forEach((x,j)=>{r.xu=r.xu||[];const u=r.xu[j]||0;const cap=x.cap===''||x.cap==null?Infinity:+x.cap;const inX=Math.min(Math.max(0,cap-u),t.amount);r.xu[j]=u+t.amount;extra+=inX*(+x.pct||0)/100});
     });
     const heads=rules.map((r,i)=>i).filter(i=>pool[i]===i);
     return{spend,total:r2(base+extra),base:r2(base),extra:r2(extra),rules:heads.map(h=>{const cap=capOf(h);const cats=[...new Set(rules.filter((r,i)=>pool[i]===h).flatMap(r=>r.cats||[]))];return{cats,pct:rules[h].pct,used:r2(pu[h]),left:cap===Infinity?null:r2(Math.max(0,cap-pu[h]))}}),capLeft:null,capUsedPct:null};
@@ -1868,7 +1870,9 @@ function openCard(id){
         <div class="field"><span>額外回贈只限以下分類（唔揀 ＝ 全部）</span>${chips(R.extraCats,c=>`data-ec="${esc(c)}"`)}</div>`
       :`<div class="small muted">唔同分類有唔同回贈，例如餐飲 4%、衣服零售 5%。超出上限或者唔屬於任何規則嘅交易，用基本回贈計。分類由 app 自動判斷，計回贈前會叫你核對。</div>
         <label class="field"><span>基本回贈 %（其他交易）</span><input id="c-base" inputmode="decimal" value="${esc(R.basePct)}"></label>
-        ${R.catRules.map((r,i)=>`<div class="review"><div class="card-head"><b>規則 ${i+1}</b><button class="icon-btn" type="button" data-rr="${i}" aria-label="移除規則 ${i+1}">✕</button></div>${chips(r.cats||[],c=>`data-rc="${i}" data-c="${esc(c)}"`)}${i>0?`<label class="li" style="gap:10px;padding:6px 0"><span class="grow small">同上一條規則合併計算簽賬上限（例如全年合共 $100,000）</span><span class="switch"><input type="checkbox" data-rsh="${i}" ${r.share?'checked':''}><span></span></span></label>`:''}<div class="row2"><label class="field"><span>上限內回贈 %</span><input data-rp="${i}" inputmode="decimal" value="${esc(r.pct)}"></label>${i>0&&r.share?`<div class="field"><span>簽賬上限</span><div class="small muted" style="padding-top:10px">同規則 ${(()=>{let h=i;while(h>0&&R.catRules[h].share)h--;return h+1})()} 合併計算</div></div>`:`<label class="field"><span>${R.capPeriod==='year'?'每年':'每月'}簽賬上限（留空 ＝ 無）${R.catRules.some((x,j)=>j>i&&x.share)?'・合併上限':''}</span><input data-rcap="${i}" inputmode="decimal" value="${esc(r.cap??'')}"></label>`}</div><label class="field"><span>超出上限後回贈 %（留空 ＝ 用基本回贈）</span><input data-rop="${i}" inputmode="decimal" value="${esc(r.overPct??'')}" placeholder="基本回贈 ${esc(R.basePct||0)}%"></label></div>`).join('')}
+        ${R.catRules.map((r,i)=>`<div class="review"><div class="card-head"><b>規則 ${i+1}</b><button class="icon-btn" type="button" data-rr="${i}" aria-label="移除規則 ${i+1}">✕</button></div>${chips(r.cats||[],c=>`data-rc="${i}" data-c="${esc(c)}"`)}${i>0?`<label class="li" style="gap:10px;padding:6px 0"><span class="grow small">同上一條規則合併計算簽賬上限（例如全年合共 $100,000）</span><span class="switch"><input type="checkbox" data-rsh="${i}" ${r.share?'checked':''}><span></span></span></label>`:''}<div class="row2"><label class="field"><span>上限內回贈 %</span><input data-rp="${i}" inputmode="decimal" value="${esc(r.pct)}"></label>${i>0&&r.share?`<div class="field"><span>簽賬上限</span><div class="small muted" style="padding-top:10px">同規則 ${(()=>{let h=i;while(h>0&&R.catRules[h].share)h--;return h+1})()} 合併計算</div></div>`:`<label class="field"><span>${R.capPeriod==='year'?'每年':'每月'}簽賬上限（留空 ＝ 無）${R.catRules.some((x,j)=>j>i&&x.share)?'・合併上限':''}</span><input data-rcap="${i}" inputmode="decimal" value="${esc(r.cap??'')}"></label>`}</div><label class="field"><span>超出上限後回贈 %（留空 ＝ 用基本回贈）</span><input data-rop="${i}" inputmode="decimal" value="${esc(r.overPct??'')}" placeholder="基本回贈 ${esc(R.basePct||0)}%"></label>
+        ${(r.extras||[]).map((x,j)=>`<div class="tier"><label class="field"><span>疊加 ${j+1}：額外 %</span><input data-xp="${i}-${j}" inputmode="decimal" value="${esc(x.pct??'')}"></label><label class="field"><span>上限（留空 ＝ 無上限）</span><input data-xc="${i}-${j}" inputmode="decimal" value="${esc(x.cap??'')}" placeholder="無上限"></label><button class="icon-btn" type="button" data-xrm="${i}-${j}" aria-label="移除疊加 ${j+1}">✕</button></div>`).join('')}
+        <button class="btn sm line" type="button" data-xadd="${i}">＋ 疊加額外回贈（例如另加 5% 無上限）</button></div>`).join('')}
         <button class="btn sm line" type="button" id="c-addrule">＋ 加一條分類規則</button>`}
       <div class="err" id="c-err" hidden></div>
       <div class="actions"><button class="btn" type="button" id="c-save">儲存</button>${isNew?'':'<button class="btn danger" type="button" id="c-del">刪除卡</button>'}</div>`,()=>{
@@ -1876,7 +1880,7 @@ function openCard(id){
         const grab=()=>{if($('#rv-m'))R.from=`${$('#rv-y').value}-${pad($('#rv-m').value)}`;if($('#o-on')){const A=octoDefaults(d);A.on=$('#o-on').value==='1';A.amt=num($('#o-amt').value)||0;A.cat=$('#o-cat').value;const b=$('#o-bal').value.trim();if(b!==''&&!isNaN(num(b))&&(!d.octoBal||num(b)!==d.octoBal.bal))d.octoBal={bal:num(b),ts:fmtLocal(new Date())}}R.resetDay=+$('#c-reset').value||1;if($('#c-desig')){DESIG.forEach(([,f])=>{d[f]=$('#c-'+f).value.trim()});d.desigAuto=$('#c-desig-auto').checked}if($('#c-per')){R.capPeriod=$('#c-per').value;if($('#c-ys'))R.yearStart=+$('#c-ys').value||1}if($('#c-fee')){d.feeFree=$('#c-fee').value!=='pay';if($('#c-feem'))d.feeMonth=+$('#c-feem').value||null}if($('#c-stmt')){d.stmtDay=+$('#c-stmt').value||null;d.stmtRule=$('#c-srule').value;if($('#c-due')){d.dueDay=+$('#c-due').value||null;d.dueMonth=$('#c-duem').value}}d.name=$('#c-name').value;d.type=$('#c-type').value;d.collect=$('#c-col').checked;d.keywords=$('#c-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);if($('#c-pref'))d.l4Pref=$('#c-pref').checked;
           if(R.mode==='tier')R.tiers.forEach((t,i)=>{const l=val(`[data-tl="${i}"]`);t.limit=l===''?'':num(l);t.pct=num(val(`[data-tp="${i}"]`))||0});
           else if(R.mode==='split'){R.basePct=num(val('#c-base'))||0;R.extraPct=num(val('#c-extra'))||0;const c=val('#c-cap');R.extraCap=c===''?'':num(c)}
-          else{R.basePct=num(val('#c-base'))||0;R.catRules.forEach((r,i)=>{r.pct=num(val(`[data-rp="${i}"]`))||0;const c=val(`[data-rcap="${i}"]`);r.cap=c===''?'':num(c);const o=val(`[data-rop="${i}"]`);r.overPct=o===''?'':num(o)})}};
+          else{R.basePct=num(val('#c-base'))||0;R.catRules.forEach((r,i)=>{r.pct=num(val(`[data-rp="${i}"]`))||0;const c=val(`[data-rcap="${i}"]`);r.cap=c===''?'':num(c);const o=val(`[data-rop="${i}"]`);r.overPct=o===''?'':num(o);(r.extras||[]).forEach((x,j)=>{x.pct=num(val(`[data-xp="${i}-${j}"]`))||0;const xc=val(`[data-xc="${i}-${j}"]`);x.cap=xc===''?'':num(xc)})})}};
         {const sr=$('#c-srule');if(sr)sr.onchange=()=>{grab();draw()}}
         {const fe=$('#c-fee');if(fe)fe.onchange=()=>{grab();draw()}}
         $('#c-per').onchange=()=>{grab();if(R.capPeriod==='year'&&!R.yearStart)R.yearStart=1;draw()};
@@ -1889,6 +1893,8 @@ function openCard(id){
         const at=$('#c-addtier');if(at)at.onclick=()=>{grab();R.tiers.push({limit:'',pct:0});draw()};
         const ar=$('#c-addrule');if(ar)ar.onclick=()=>{grab();R.catRules.push({cats:[],pct:0,cap:''});draw()};
         document.querySelectorAll('[data-rr]').forEach(b=>b.onclick=()=>{grab();R.catRules.splice(+b.dataset.rr,1);if(R.catRules[0])delete R.catRules[0].share;draw()});
+        document.querySelectorAll('[data-xadd]').forEach(b=>b.onclick=()=>{grab();const r=R.catRules[+b.dataset.xadd];(r.extras=r.extras||[]).push({pct:0,cap:''});draw()});
+        document.querySelectorAll('[data-xrm]').forEach(b=>b.onclick=()=>{grab();const[i,j]=b.dataset.xrm.split('-').map(Number);R.catRules[i].extras.splice(j,1);draw()});
         document.querySelectorAll('[data-rsh]').forEach(b=>b.onchange=()=>{grab();R.catRules[+b.dataset.rsh].share=b.checked;draw()});
         document.querySelectorAll('[data-ec]').forEach(b=>b.onclick=()=>{const c=b.dataset.ec;const i=R.extraCats.indexOf(c);i<0?R.extraCats.push(c):R.extraCats.splice(i,1);b.setAttribute('aria-pressed',i<0)});
         document.querySelectorAll('[data-rc]').forEach(b=>b.onclick=()=>{const r=R.catRules[+b.dataset.rc];r.cats=r.cats||[];const c=b.dataset.c;const i=r.cats.indexOf(c);i<0?r.cats.push(c):r.cats.splice(i,1);b.setAttribute('aria-pressed',i<0)});
