@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.18-47';
+const APP_VERSION='2026.10.18-48';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1123,7 +1123,7 @@ function sheetRows(){
   rebuild();
   const tx=[['日期','時間','商戶/描述','分類','渠道','類型','金額 (HKD)','狀態','來源','備註']].concat(ALL.map(t=>[t.noDay?t.ts.slice(0,7):t.ts.slice(0,10),t.noDay?'未指定':t.ts.slice(11,16),t.merchant,t.category,chName(t.channel),TYPE_L[t.type]||t.type,t.amount,ST_L[t.status]||'',(t.sources||[t.source]).map(s=>SRC_L[s]||s).join(' + '),t.note||'']));
   const months=[...new Set(ALL.map(t=>t.ts.slice(0,7)).concat(S.incomeEntries.map(e=>e.month)).concat([curMonth()]))].sort();
-  const mon=[['月份','支出','退款','定期收入','結餘','單一收入（不計）']].concat(months.map(m=>{const x=ALL.filter(t=>t.ts.startsWith(m));const e=sum(x.filter(isExp)),r=sum(x.filter(isRef)),i=sum(incomeItems(m));return[m,e,r,i,r2(i-e+r),sum(onceIncome(m))]}));
+  const mon=[['月份','支出','退款','固定收入','額外收入','結餘']].concat(months.map(m=>{const x=ALL.filter(t=>t.ts.startsWith(m));const e=sum(x.filter(isExp)),r=sum(x.filter(isRef)),i=sum(incomeItems(m)),o=sum(onceIncome(m));return[m,e,r,i,o,r2(i+o-e+r)]}));
   const cat=[['月份','分類','金額','筆數']];months.forEach(m=>CAT_NAMES.forEach(c=>{const x=ALL.filter(t=>t.ts.startsWith(m)&&t.category===c&&isExp(t));if(x.length)cat.push([m,c,sum(x),x.length])}));
   const inc=[['月份','項目','類別','金額']];months.forEach(m=>incomeItems(m).forEach(i=>inc.push([m,i.name,KIND[i.kind]||'',i.amount])));
   const bills=[['名稱','每期金額','周期','開始','結束','分類','渠道']].concat(S.bills.map(b=>[b.name,b.amount,cycleText(b),schedStart(b),b.endDate||'直至另行通知',b.category,chName(b.channel)]));
@@ -1270,7 +1270,7 @@ function monthsAvailable(){
 }
 function renderOverview(){
   const m=ui.month,tx=ALL.filter(t=>t.ts.startsWith(m));
-  const exp=sum(tx.filter(isExp)),ref=sum(tx.filter(isRef)),incItems=incomeItems(m),inc=sum(incItems),bal=r2(inc-exp+ref),once=sum(onceIncome(m));
+  const exp=sum(tx.filter(isExp)),ref=sum(tx.filter(isRef)),incItems=incomeItems(m),inc=sum(incItems),once=sum(onceIncome(m)),bal=r2(inc+once-exp+ref);
   const nd=daysIn(m),daily=Array(nd).fill(0);tx.filter(t=>isExp(t)&&!t.noDay).forEach(t=>daily[+t.ts.slice(8,10)-1]+=t.amount);const noDayAmt=sum(tx.filter(t=>isExp(t)&&t.noDay));
   // 柱高：金額相差唔大就照比例；相差太大（最大 ÷ 最小 > 15 倍）就壓縮比例，令細額都睇得到，特別大嘅日子加斷開符號
   const nz=daily.filter(v=>v>0).sort((a,b)=>a-b);const minNZ=nz[0]||0,maxNZ=nz[nz.length-1]||0;
@@ -1311,8 +1311,10 @@ function renderOverview(){
   </div>
 
   <div class="grid2">
-    <div class="card stat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M17 7L7 17M7 9v8h8"/></svg></span><div>本月收入</div><div class="v num">${masked(inc)}</div><div class="small muted">只計定期收入${once?` · 另有單一收入 ${masked(once)}（別人轉帳等，唔計）`:''}</div></div>
-    <div class="card stat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 9c2-2 4 2 7 0s5-2 7 0M5 15c2-2 4 2 7 0s5-2 7 0"/></svg></span><div>本月收支結餘</div><div class="v num">${masked(bal)}</div><div class="small muted">定期收入 − 支出 ＋ 退款</div></div>
+    <div class="card stat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M17 7L7 17M7 9v8h8"/></svg></span><div>本月收入</div>
+      <div style="margin-top:4px;display:grid;gap:4px"><div><div class="small muted">固定收入</div><b class="num" style="font-size:clamp(17px,5vw,24px);white-space:nowrap">${masked(inc)}</b></div><div><div class="small muted">額外收入</div><b class="num" style="font-size:clamp(17px,5vw,24px);white-space:nowrap">${masked(once)}</b></div></div>
+      <div class="small muted">額外收入 ＝ 別人轉帳俾你等</div></div>
+    <div class="card stat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 9c2-2 4 2 7 0s5-2 7 0M5 15c2-2 4 2 7 0s5-2 7 0"/></svg></span><div>本月收支結餘</div><div class="v num">${masked(bal)}</div><div class="small muted">固定收入 ＋ 額外收入 − 支出 ＋ 退款</div></div>
   </div>
 
   <div class="card">
@@ -1330,7 +1332,7 @@ function renderOverview(){
 
   <div class="card">
     <div class="card-head"><h3>定期收入</h3><button class="btn sm ghost" type="button" data-act="add-income">＋ 新增收入</button></div>
-    <div class="small muted">例如底薪、Bonus。別人轉帳俾你嘅錢（PayMe、轉數快、現金收入）係「單一收入」，只會喺記錄與核實出現，唔計喺度。</div>
+    <div class="small muted">例如底薪、Bonus。別人轉帳俾你嘅錢（PayMe、轉數快、現金收入）係「額外收入」，喺記錄與核實出現，唔列喺呢度，但會計入上面「本月收入 · 額外收入」同結餘。</div>
     <div class="datef two"><select id="inc-y" aria-label="收入年份">${yrs.map(k=>`<option value="${k}" ${k===imY?'selected':''}>${k} 年</option>`).join('')}</select><select id="inc-m" aria-label="收入月份">${Array.from({length:12},(_,i)=>`<option value="${i+1}" ${i+1===imM?'selected':''}>${i+1} 月</option>`).join('')}</select></div>
     <div class="sum-line"><span class="muted small">${imY}年${imM}月定期收入合計</span><b class="num">${masked(sum(imItems))}</b></div>
     <div class="list">${imItems.length?imItems.map(i=>`<button class="li" type="button" data-act="${i.src==='txn'?'edit':'edit-income'}" data-id="${esc(i.id)}" data-src="${i.src}"><span class="badge">${KIND[i.kind]||'其他'}</span><span class="grow"><span class="t" style="display:block">${esc(i.name)}</span><span class="m">${i.src==='tpl'?`${cycleText(i.tpl)}${i.n>1?` × ${i.n} 次`:''} · ${endText(i.tpl)}${i.adjusted?' · 本月已調整':''}${i.actual?' · ✓ 已收到實際入數':''}`:`手動加${i.day?` · ${i.day} 日`:''}`}</span></span><span class="amt num">${masked(i.amount)}</span></button>`).join(''):'<div class="empty">呢個月未有定期收入。可以設定每月底薪，或者逐月加 Bonus。</div>'}</div>
