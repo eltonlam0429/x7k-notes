@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.18-49';
+const APP_VERSION='2026.10.18-51';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1061,6 +1061,7 @@ function calcRebate(card,txs,Rv){
   const R=Rv||card.rebate||{mode:'tier',tiers:[]};const exp=txs.filter(isExp);const spend=sum(exp)-sum(txs.filter(isRef));
   if(R.mode==='cat'){
     const rules=(R.catRules||[]).map(r=>({...r,used:0}));let base=0,extra=0;
+    const rcap=R.rebCap===''||R.rebCap==null||!(+R.rebCap>0)?Infinity:+R.rebCap;let rcu=0;
     // 「同上一條合併計算」嘅規則共用同一個簽賬上限（用第一條嘅上限）
     const pool=[];rules.forEach((r,i)=>{pool[i]=i>0&&r.share?pool[i-1]:i});const pu=rules.map(()=>0);
     const capOf=i=>{const h=rules[pool[i]];return h.cap===''||h.cap==null?Infinity:+h.cap};
@@ -1068,14 +1069,22 @@ function calcRebate(card,txs,Rv){
       const ri=rules.findIndex(r=>(r.cats||[]).includes(t.category));
       if(ri<0){base+=t.amount*(+R.basePct||0)/100;return}
       const r=rules[ri],p=pool[ri],cap=capOf(ri);const inCap=Math.min(Math.max(0,cap-pu[p]),t.amount);
-      pu[p]+=t.amount;r.used+=t.amount;extra+=inCap*(+r.pct||0)/100;
+      pu[p]+=t.amount;r.used+=t.amount;let tb=0,tx=inCap*(+r.pct||0)/100;
       // 超出上限：有填「超出上限後 %」就用佢，否則用基本回贈
-      const over=t.amount-inCap;if(r.overPct!==''&&r.overPct!=null)extra+=over*(+r.overPct||0)/100;else base+=over*(+R.basePct||0)/100;
+      const over=t.amount-inCap;if(r.overPct!==''&&r.overPct!=null)tx+=over*(+r.overPct||0)/100;else tb+=over*(+R.basePct||0)/100;
       // 疊加額外回贈：每層有自己嘅上限（只計呢條規則嘅簽賬），同上面獨立計
-      (r.extras||[]).forEach((x,j)=>{r.xu=r.xu||[];const u=r.xu[j]||0;const cap=x.cap===''||x.cap==null?Infinity:+x.cap;const inX=Math.min(Math.max(0,cap-u),t.amount);r.xu[j]=u+t.amount;extra+=inX*(+x.pct||0)/100});
+      (r.extras||[]).forEach((x,j)=>{r.xu=r.xu||[];const u=r.xu[j]||0;const cap=x.cap===''||x.cap==null?Infinity:+x.cap;const inX=Math.min(Math.max(0,cap-u),t.amount);r.xu[j]=u+t.amount;tx+=inX*(+x.pct||0)/100});
+      // 合併回贈金額上限：勾咗嘅規則所賺嘅回贈（可選扣除基本回贈後嘅額外部分）合共唔可以超過上限
+      if(rcap!==Infinity&&r.inRebCap){
+        const all=tb+tx,keep=R.rebCapNet!==false?Math.min(all,t.amount*(+R.basePct||0)/100):0,part=Math.max(0,all-keep);
+        const ok=Math.min(part,Math.max(0,rcap-rcu));rcu+=ok;tb=keep;tx=ok;
+        // 唔扣基本回贈：上限連基本回贈一齊計；封頂之後，未計入上限嗰部分簽賬照有基本回贈
+        if(R.rebCapNet===false&&part>0&&ok<part)tb+=t.amount*(1-ok/part)*(+R.basePct||0)/100;
+      }
+      base+=tb;extra+=tx;
     });
     const heads=rules.map((r,i)=>i).filter(i=>pool[i]===i);
-    return{spend,total:r2(base+extra),base:r2(base),extra:r2(extra),rules:heads.map(h=>{const cap=capOf(h);const cats=[...new Set(rules.filter((r,i)=>pool[i]===h).flatMap(r=>r.cats||[]))];return{cats,pct:rules[h].pct,used:r2(pu[h]),left:cap===Infinity?null:r2(Math.max(0,cap-pu[h]))}}),capLeft:null,capUsedPct:null};
+    return{spend,total:r2(base+extra),base:r2(base),extra:r2(extra),rules:heads.map(h=>{const cap=capOf(h);const cats=[...new Set(rules.filter((r,i)=>pool[i]===h).flatMap(r=>r.cats||[]))];return{cats,pct:rules[h].pct,used:r2(pu[h]),left:cap===Infinity?null:r2(Math.max(0,cap-pu[h]))}}),capLeft:null,capUsedPct:null,rebCapLeft:rcap===Infinity?null:r2(Math.max(0,rcap-rcu)),rebCapUsed:r2(rcu)};
   }
   if(R.mode==='split'){
     const base=Math.max(0,spend)*(+R.basePct||0)/100;
@@ -1464,7 +1473,7 @@ function renderCards(){
     <label class="field"><span>Apple Pay 同短訊合併時間範圍</span><select id="merge-h">${[2,6,12,24,48].map(h=>`<option value="${h}" ${S.settings.mergeHours===h?'selected':''}>${h} 小時內同金額就當係同一筆候選</option>`).join('')}</select></label>
   </div>
   <div class="card"><div class="card-head"><h3>我的卡（本期回贈）</h3><button class="btn sm ghost" type="button" data-act="add-card">＋ 新增卡</button></div>
-    <div class="list">${S.cards.length?S.cards.map(c=>{const cy=rebateCycle(c),r=calcRebate(c,cardSpend(c,cy),rebateAt(c,cy.s));return`<button class="li" type="button" data-act="edit-card" data-id="${esc(c.id)}" style="flex-wrap:wrap"><span class="grow"><span class="t" style="display:block">${esc(c.name)} <span class="badge">${TYPE_CARD[c.type]||c.type}</span>${c.collect===false?' <span class="badge">唔收集</span>':''}${c.auto?' <span class="badge">自動發現</span>':''}${sameL4(c).length?` <span class="badge">${c.l4Pref?'同尾號 · 優先':'同尾號'}</span>`:''}</span><span class="m">${c.type==='octopus'&&c.octoBal?`餘額 ${money(c.octoBal.bal)} · `:''}${c.type==='octopus'?(()=>{const tu=S.txns.filter(t=>t.channel===c.id&&t.type==='transfer'&&/增值/.test(t.merchant||'')&&t.ts.startsWith(curMonth()));if(!tu.length)return'';const last=tu.reduce((a,b)=>a.ts>b.ts?a:b);return`本月增值 ${money(sum(tu))}（${tu.length} 次，最近 ${last.ts.slice(8,10)}/${last.ts.slice(5,7)} +${money(last.amount)}）· `})():''}${cy.year?'本年度':'本期'} ${cy.label} · 簽賬 ${money(r.spend)} · 預計回贈 ${money(r.total)}${r.rules?r.rules.filter(x=>x.left!=null).map(x=>` · ${esc(x.cats.join('/'))}額度尚餘 ${money(x.left)}`).join(''):r.capLeft!=null?` · 高回贈額度尚餘 ${money(r.capLeft)}`:''}</span>${r.capUsedPct!=null?`<span class="progress" style="display:block;margin-top:6px"><i style="width:${r.capUsedPct}%"></i></span>`:''}${stmtHtml(c)}${feeHtml(c)}</span><span class="faint">›</span></button>${(()=>{const n=catCheckList(c,m).length;return n?`<button class="warn-chip" type="button" data-act="cat-check" data-id="${esc(c.id)}">⚠ ${n} 筆交易要核對分類（影響回贈）</button>`:''})()}`}).join(''):'<div class="empty">未有卡。匯入第一個 Apple Pay 通知或者短訊時會自動加入。</div>'}</div>
+    <div class="list">${S.cards.length?S.cards.map(c=>{const cy=rebateCycle(c),r=calcRebate(c,cardSpend(c,cy),rebateAt(c,cy.s));return`<button class="li" type="button" data-act="edit-card" data-id="${esc(c.id)}" style="flex-wrap:wrap"><span class="grow"><span class="t" style="display:block">${esc(c.name)} <span class="badge">${TYPE_CARD[c.type]||c.type}</span>${c.collect===false?' <span class="badge">唔收集</span>':''}${c.auto?' <span class="badge">自動發現</span>':''}${sameL4(c).length?` <span class="badge">${c.l4Pref?'同尾號 · 優先':'同尾號'}</span>`:''}</span><span class="m">${c.type==='octopus'&&c.octoBal?`餘額 ${money(c.octoBal.bal)} · `:''}${c.type==='octopus'?(()=>{const tu=S.txns.filter(t=>t.channel===c.id&&t.type==='transfer'&&/增值/.test(t.merchant||'')&&t.ts.startsWith(curMonth()));if(!tu.length)return'';const last=tu.reduce((a,b)=>a.ts>b.ts?a:b);return`本月增值 ${money(sum(tu))}（${tu.length} 次，最近 ${last.ts.slice(8,10)}/${last.ts.slice(5,7)} +${money(last.amount)}）· `})():''}${cy.year?'本年度':'本期'} ${cy.label} · 簽賬 ${money(r.spend)} · 預計回贈 ${money(r.total)}${r.rules?r.rules.filter(x=>x.left!=null).map(x=>` · ${esc(x.cats.join('/'))}額度尚餘 ${money(x.left)}`).join(''):r.capLeft!=null?` · 高回贈額度尚餘 ${money(r.capLeft)}`:''}${r.rebCapLeft!=null?` · 合併回贈上限尚餘 ${money(r.rebCapLeft)}（已用 ${money(r.rebCapUsed)}）`:''}</span>${r.capUsedPct!=null?`<span class="progress" style="display:block;margin-top:6px"><i style="width:${r.capUsedPct}%"></i></span>`:''}${stmtHtml(c)}${feeHtml(c)}</span><span class="faint">›</span></button>${(()=>{const n=catCheckList(c,m).length;return n?`<button class="warn-chip" type="button" data-act="cat-check" data-id="${esc(c.id)}">⚠ ${n} 筆交易要核對分類（影響回贈）</button>`:''})()}`}).join(''):'<div class="empty">未有卡。匯入第一個 Apple Pay 通知或者短訊時會自動加入。</div>'}</div>
   </div>
   <div class="card"><h3>安裝「記帳送出」捷徑</h3>
     <div class="small muted">所有自動化都經呢個捷徑送資料去試算表。安裝時 iPhone 會叫你填網址同密碼；密碼只會存喺捷徑入面，呢個 app 唔會經手亦唔會儲存。</div>
@@ -1879,14 +1888,22 @@ function openCard(id){
         ${R.catRules.map((r,i)=>`<div class="review"><div class="card-head"><b>規則 ${i+1}</b><button class="icon-btn" type="button" data-rr="${i}" aria-label="移除規則 ${i+1}">✕</button></div>${chips(r.cats||[],c=>`data-rc="${i}" data-c="${esc(c)}"`)}${i>0?`<label class="li" style="gap:10px;padding:6px 0"><span class="grow small">同上一條規則合併計算簽賬上限（例如全年合共 $100,000）</span><span class="switch"><input type="checkbox" data-rsh="${i}" ${r.share?'checked':''}><span></span></span></label>`:''}<div class="row2"><label class="field"><span>上限內回贈 %</span><input data-rp="${i}" inputmode="decimal" value="${esc(r.pct)}"></label>${i>0&&r.share?`<div class="field"><span>簽賬上限</span><div class="small muted" style="padding-top:10px">同規則 ${(()=>{let h=i;while(h>0&&R.catRules[h].share)h--;return h+1})()} 合併計算</div></div>`:`<label class="field"><span>${R.capPeriod==='year'?'每年':'每月'}簽賬上限（留空 ＝ 無）${R.catRules.some((x,j)=>j>i&&x.share)?'・合併上限':''}</span><input data-rcap="${i}" inputmode="decimal" value="${esc(r.cap??'')}"></label>`}</div><label class="field"><span>超出上限後回贈 %（留空 ＝ 用基本回贈）</span><input data-rop="${i}" inputmode="decimal" value="${esc(r.overPct??'')}" placeholder="基本回贈 ${esc(R.basePct||0)}%"></label>
         ${(r.extras||[]).map((x,j)=>`<div class="tier"><label class="field"><span>疊加 ${j+1}：額外 %</span><input data-xp="${i}-${j}" inputmode="decimal" value="${esc(x.pct??'')}"></label><label class="field"><span>上限（留空 ＝ 無上限）</span><input data-xc="${i}-${j}" inputmode="decimal" value="${esc(x.cap??'')}" placeholder="無上限"></label><button class="icon-btn" type="button" data-xrm="${i}-${j}" aria-label="移除疊加 ${j+1}">✕</button></div>`).join('')}
         <button class="btn sm line" type="button" data-xadd="${i}">＋ 疊加額外回贈（例如另加 5% 無上限）</button></div>`).join('')}
-        <button class="btn sm line" type="button" id="c-addrule">＋ 加一條分類規則</button>`}
+        <button class="btn sm line" type="button" id="c-addrule">＋ 加一條分類規則</button>
+        <div class="review"><b>合併回贈金額上限（選擇性）</b>
+          <div class="small muted">例如「10% 同 5% 類別嘅額外回贈合共每月最多 $150」：填 150，再喺下面勾邊啲規則一齊計。唔使就留空。</div>
+          <label class="field"><span>${R.capPeriod==='year'?'每年':'每月'}合併回贈上限（HK$）</span><input id="c-rcap" inputmode="decimal" value="${esc(R.rebCap??'')}" placeholder="留空 ＝ 唔使"></label>
+          ${+R.rebCap>0?`<label class="li" style="gap:10px;padding:4px 0"><span class="grow small">上限只計扣除基本回贈（${esc(R.basePct||0)}%）後嘅額外部分（例如 10% → 9.6%、5% → 4.6%）；熄咗 ＝ 連基本回贈一齊計入上限。兩種情況封頂後都照有基本回贈</span><span class="switch"><input type="checkbox" id="c-rnet" ${R.rebCapNet!==false?'checked':''}><span></span></span></label>
+          <div class="small muted" style="margin-top:4px">勾選計入呢個上限嘅規則：</div>
+          <div class="chips">${R.catRules.map((r,i)=>`<button class="chip" type="button" data-rin="${i}" aria-pressed="${!!r.inRebCap}">規則 ${i+1}${(r.cats||[]).length?`（${esc(r.cats.slice(0,3).join('/'))}${r.cats.length>3?'…':''}）`:''}</button>`).join('')}</div>
+          ${(()=>{const n=R.catRules.filter(r=>r.inRebCap).map(r=>(+r.pct||0)-(R.rebCapNet!==false?(+R.basePct||0):0)).filter(x=>x>0);return n.length?`<div class="small faint">封頂大約要簽：${R.catRules.filter(r=>r.inRebCap).map((r,j)=>{const x=(+r.pct||0)-(R.rebCapNet!==false?(+R.basePct||0):0);return x>0?`${esc((r.cats||[]).slice(0,2).join('/')||'規則')} 約 ${money(+R.rebCap/x*100)}`:''}).filter(Boolean).join('；')}（只簽嗰類嘅情況）</div>`:''})()}`:''}
+        </div>`}
       <div class="err" id="c-err" hidden></div>
       <div class="actions"><button class="btn" type="button" id="c-save">儲存</button>${isNew?'':'<button class="btn danger" type="button" id="c-del">刪除卡</button>'}</div>`,()=>{
         const val=q=>{const e=document.querySelector(q);return e?e.value.trim():''};
         const grab=()=>{if($('#rv-m'))R.from=`${$('#rv-y').value}-${pad($('#rv-m').value)}`;if($('#o-on')){const A=octoDefaults(d);A.on=$('#o-on').value==='1';A.amt=num($('#o-amt').value)||0;A.cat=$('#o-cat').value;const b=$('#o-bal').value.trim();if(b!==''&&!isNaN(num(b))&&(!d.octoBal||num(b)!==d.octoBal.bal))d.octoBal={bal:num(b),ts:fmtLocal(new Date())}}R.resetDay=+$('#c-reset').value||1;if($('#c-desig')){DESIG.forEach(([,f])=>{d[f]=$('#c-'+f).value.trim()});d.desigAuto=$('#c-desig-auto').checked}if($('#c-per')){R.capPeriod=$('#c-per').value;if($('#c-ys'))R.yearStart=+$('#c-ys').value||1}if($('#c-fee')){d.feeFree=$('#c-fee').value!=='pay';if($('#c-feem'))d.feeMonth=+$('#c-feem').value||null}if($('#c-stmt')){d.stmtDay=+$('#c-stmt').value||null;d.stmtRule=$('#c-srule').value;if($('#c-due')){d.dueDay=+$('#c-due').value||null;d.dueMonth=$('#c-duem').value}}d.name=$('#c-name').value;d.type=$('#c-type').value;d.collect=$('#c-col').checked;d.keywords=$('#c-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);if($('#c-pref'))d.l4Pref=$('#c-pref').checked;
           if(R.mode==='tier')R.tiers.forEach((t,i)=>{const l=val(`[data-tl="${i}"]`);t.limit=l===''?'':num(l);t.pct=num(val(`[data-tp="${i}"]`))||0});
           else if(R.mode==='split'){R.basePct=num(val('#c-base'))||0;R.extraPct=num(val('#c-extra'))||0;const c=val('#c-cap');R.extraCap=c===''?'':num(c)}
-          else{R.basePct=num(val('#c-base'))||0;R.catRules.forEach((r,i)=>{r.pct=num(val(`[data-rp="${i}"]`))||0;const c=val(`[data-rcap="${i}"]`);r.cap=c===''?'':num(c);const o=val(`[data-rop="${i}"]`);r.overPct=o===''?'':num(o);(r.extras||[]).forEach((x,j)=>{x.pct=num(val(`[data-xp="${i}-${j}"]`))||0;const xc=val(`[data-xc="${i}-${j}"]`);x.cap=xc===''?'':num(xc)})})}};
+          else{R.basePct=num(val('#c-base'))||0;if($('#c-rcap')){const rc=val('#c-rcap');R.rebCap=rc===''?'':num(rc);if($('#c-rnet'))R.rebCapNet=$('#c-rnet').checked}R.catRules.forEach((r,i)=>{r.pct=num(val(`[data-rp="${i}"]`))||0;const c=val(`[data-rcap="${i}"]`);r.cap=c===''?'':num(c);const o=val(`[data-rop="${i}"]`);r.overPct=o===''?'':num(o);(r.extras||[]).forEach((x,j)=>{x.pct=num(val(`[data-xp="${i}-${j}"]`))||0;const xc=val(`[data-xc="${i}-${j}"]`);x.cap=xc===''?'':num(xc)})})}};
         {const sr=$('#c-srule');if(sr)sr.onchange=()=>{grab();draw()}}
         {const fe=$('#c-fee');if(fe)fe.onchange=()=>{grab();draw()}}
         $('#c-per').onchange=()=>{grab();if(R.capPeriod==='year'&&!R.yearStart)R.yearStart=1;draw()};
@@ -1899,6 +1916,9 @@ function openCard(id){
         const at=$('#c-addtier');if(at)at.onclick=()=>{grab();R.tiers.push({limit:'',pct:0});draw()};
         const ar=$('#c-addrule');if(ar)ar.onclick=()=>{grab();R.catRules.push({cats:[],pct:0,cap:''});draw()};
         document.querySelectorAll('[data-rr]').forEach(b=>b.onclick=()=>{grab();R.catRules.splice(+b.dataset.rr,1);if(R.catRules[0])delete R.catRules[0].share;draw()});
+        {const rc=$('#c-rcap');if(rc)rc.onchange=()=>{grab();draw()}}
+        {const rn=$('#c-rnet');if(rn)rn.onchange=()=>{grab();draw()}}
+        document.querySelectorAll('[data-rin]').forEach(b=>b.onclick=()=>{grab();const r=R.catRules[+b.dataset.rin];r.inRebCap=!r.inRebCap;draw()});
         document.querySelectorAll('[data-xadd]').forEach(b=>b.onclick=()=>{grab();const r=R.catRules[+b.dataset.xadd];(r.extras=r.extras||[]).push({pct:0,cap:''});draw()});
         document.querySelectorAll('[data-xrm]').forEach(b=>b.onclick=()=>{grab();const[i,j]=b.dataset.xrm.split('-').map(Number);R.catRules[i].extras.splice(j,1);draw()});
         document.querySelectorAll('[data-rsh]').forEach(b=>b.onchange=()=>{grab();R.catRules[+b.dataset.rsh].share=b.checked;draw()});
