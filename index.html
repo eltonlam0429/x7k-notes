@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.18-40';
+const APP_VERSION='2026.10.18-41';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1002,16 +1002,25 @@ function rebateCycle(card,dk=todayKey()){
 }
 const cycleOfMonth=(card,m)=>rebateCycle(card,`${m}-${pad(Math.min(Math.max(1,+((card.rebate||{}).resetDay)||1),daysIn(m)))}`);
 // 信用卡結單：結單日（截數日）歸零再計；上期結單金額 ＝ 預計要還
+// 香港公眾假期（星期日除外），用嚟估算還款日；冇列到嘅年份就唔順延（寧早唔遲）
+const HK_HOL=new Set(['2025-01-01','2025-01-29','2025-01-30','2025-01-31','2025-04-04','2025-04-18','2025-04-19','2025-04-21','2025-05-01','2025-05-05','2025-05-31','2025-07-01','2025-10-01','2025-10-07','2025-10-29','2025-12-25','2025-12-26',
+ '2026-01-01','2026-02-17','2026-02-18','2026-02-19','2026-04-03','2026-04-04','2026-04-06','2026-04-07','2026-05-01','2026-05-25','2026-06-19','2026-07-01','2026-09-26','2026-10-01','2026-10-19','2026-12-25','2026-12-26',
+ '2027-01-01','2027-02-06','2027-02-08','2027-02-09','2027-03-26','2027-03-27','2027-03-29','2027-04-05','2027-05-01','2027-05-13','2027-06-09','2027-07-01','2027-09-16','2027-10-01','2027-10-08','2027-12-25','2027-12-27']);
+const wday=k=>toDate(k+'T12:00').getDay();
+const isWork=k=>{const w=wday(k);return w!==0&&w!==6&&!HK_HOL.has(k)};
+const nextWork=k=>{let x=k;for(let i=0;i<10&&!isWork(x);i++)x=addDays(x,1);return x};
+const STMT_RULE={fixed:'固定日子（自己揀）',hsbc:'滙豐／恒生：結單日＋26 日',boc:'中銀：結單日＋26 日'};
 function stmtInfo(c){
-  const sd=+c.stmtDay;if(!sd)return null;const today=todayKey();
-  const at=ym=>`${ym}-${pad(Math.min(sd,daysIn(ym)))}`;
+  const sd=+c.stmtDay;if(!sd)return null;const today=todayKey();const rule=c.stmtRule||'fixed';
+  // 滙豐／恒生：截數日遇星期日順延到星期一
+  const at=ym=>{const k=`${ym}-${pad(Math.min(sd,daysIn(ym)))}`;return rule==='hsbc'&&wday(k)===0?addDays(k,1):k};
   let ym=curMonth();if(at(ym)>today)ym=addMonths(ym,-1);
   const s0=at(addMonths(ym,-1)),s1=at(ym),s2=at(addMonths(ym,1));
-  const dueOf=y=>{if(!+c.dueDay)return null;const nx=c.dueMonth==='same'?false:c.dueMonth==='next'?true:+c.dueDay<=sd;const dm=nx?addMonths(y,1):y;return`${dm}-${pad(Math.min(+c.dueDay,daysIn(dm)))}`};
+  const dueOf=y=>{if(rule!=='fixed')return nextWork(addDays(at(y),26));if(!+c.dueDay)return null;const nx=c.dueMonth==='same'?false:c.dueMonth==='next'?true:+c.dueDay<=sd;const dm=nx?addMonths(y,1):y;return`${dm}-${pad(Math.min(+c.dueDay,daysIn(dm)))}`};
   const tx=ALL.filter(t=>t.channel===c.id),d=t=>t.ts.slice(0,10);
   const tot=(a,b)=>r2(sum(tx.filter(t=>isExp(t)&&d(t)>a&&d(t)<=b))-sum(tx.filter(t=>isRef(t)&&d(t)>a&&d(t)<=b)));
   const due=dueOf(ym),left=due?Math.round((toDate(due+'T00:00')-toDate(today+'T00:00'))/864e5):null;
-  return{s0,s1,s2,due,left,amt:tot(s0,s1),cur:tot(s1,'9999'),nextDue:dueOf(addMonths(ym,1))};
+  return{s0,s1,s2,due,left,amt:tot(s0,s1),cur:tot(s1,'9999'),nextDue:dueOf(addMonths(ym,1)),est:rule!=='fixed'};
 }
 const md=k=>`${k.slice(8,10)}/${k.slice(5,7)}`,mdc=k=>`${+k.slice(5,7)}月${+k.slice(8,10)}日`;
 function stmtHtml(c){
@@ -1019,7 +1028,7 @@ function stmtHtml(c){
   if(!si)return`<span class="m" style="display:block;margin-top:4px">結單日／到期還款日未設定（撳入去設定）</span>`;
   const st=si.due==null?'':si.left<0?`<b style="color:var(--ink-2)">已過到期日</b>`:si.left===0?`<b style="color:var(--red)">今日到期</b>`:`<b style="color:${si.left<=5?'var(--red)':'var(--ink)'}">尚餘 ${si.left} 日</b>`;
   return`<span class="stmt" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;padding:8px;border-radius:10px;background:var(--accent-soft)">
-    <span><span class="m" style="display:block">結單日</span><b class="num">${mdc(si.s1)}</b><span class="m" style="display:block">每月 ${+c.stmtDay} 號截數</span></span>
+    <span><span class="m" style="display:block">結單日</span><b class="num">${mdc(si.s1)}</b><span class="m" style="display:block">每月 ${+c.stmtDay} 號截數${si.est?' · 估算':''}</span></span>
     <span><span class="m" style="display:block">到期還款日</span><b class="num">${si.due?mdc(si.due):'未設定'}</b><span class="m" style="display:block">${st||'&nbsp;'}</span></span>
     <span><span class="m" style="display:block">預計還款</span><b class="num">${money(si.amt)}</b><span class="m" style="display:block">${md(addDays(si.s0,1))}–${md(si.s1)}</span></span></span>
     <span class="m" style="display:block;margin-top:4px">本期至今（${md(addDays(si.s1,1))} 起，${md(si.s2)} 截數${si.nextDue?`，${md(si.nextDue)} 到期`:''}）：${money(si.cur)}</span>`;
@@ -1031,13 +1040,17 @@ function calcRebate(card,txs,Rv){
   const R=Rv||card.rebate||{mode:'tier',tiers:[]};const exp=txs.filter(isExp);const spend=sum(exp)-sum(txs.filter(isRef));
   if(R.mode==='cat'){
     const rules=(R.catRules||[]).map(r=>({...r,used:0}));let base=0,extra=0;
+    // 「同上一條合併計算」嘅規則共用同一個簽賬上限（用第一條嘅上限）
+    const pool=[];rules.forEach((r,i)=>{pool[i]=i>0&&r.share?pool[i-1]:i});const pu=rules.map(()=>0);
+    const capOf=i=>{const h=rules[pool[i]];return h.cap===''||h.cap==null?Infinity:+h.cap};
     [...exp].sort((a,b)=>a.ts<b.ts?-1:1).forEach(t=>{
-      const r=rules.find(r=>(r.cats||[]).includes(t.category));
-      if(!r){base+=t.amount*(+R.basePct||0)/100;return}
-      const cap=r.cap===''||r.cap==null?Infinity:+r.cap;const inCap=Math.min(Math.max(0,cap-r.used),t.amount);
-      r.used+=t.amount;extra+=inCap*(+r.pct||0)/100;base+=(t.amount-inCap)*(+R.basePct||0)/100;
+      const ri=rules.findIndex(r=>(r.cats||[]).includes(t.category));
+      if(ri<0){base+=t.amount*(+R.basePct||0)/100;return}
+      const r=rules[ri],p=pool[ri],cap=capOf(ri);const inCap=Math.min(Math.max(0,cap-pu[p]),t.amount);
+      pu[p]+=t.amount;r.used+=t.amount;extra+=inCap*(+r.pct||0)/100;base+=(t.amount-inCap)*(+R.basePct||0)/100;
     });
-    return{spend,total:r2(base+extra),base:r2(base),extra:r2(extra),rules:rules.map(r=>({cats:r.cats||[],pct:r.pct,used:r2(r.used),left:r.cap===''||r.cap==null?null:r2(Math.max(0,+r.cap-r.used))})),capLeft:null,capUsedPct:null};
+    const heads=rules.map((r,i)=>i).filter(i=>pool[i]===i);
+    return{spend,total:r2(base+extra),base:r2(base),extra:r2(extra),rules:heads.map(h=>{const cap=capOf(h);const cats=[...new Set(rules.filter((r,i)=>pool[i]===h).flatMap(r=>r.cats||[]))];return{cats,pct:rules[h].pct,used:r2(pu[h]),left:cap===Infinity?null:r2(Math.max(0,cap-pu[h]))}}),capLeft:null,capUsedPct:null};
   }
   if(R.mode==='split'){
     const base=Math.max(0,spend)*(+R.basePct||0)/100;
@@ -1803,9 +1816,13 @@ function openCard(id){
       ${(()=>{const o=sameL4(d);return o.length?`<div class="review"><div class="q">⚠ 呢張卡同「${o.map(x=>esc(x.name)).join('、')}」用同一個尾號。</div>
         <div class="small muted">app 會先睇通知／電郵有冇提到其中一張卡嘅名或者其他辨認字眼（例如 Wallet 入面張卡嘅名、Visa／Mastercard），所以請喺上面「辨認字眼」加多一個每張卡獨有嘅字。認唔到嘅時候就用「優先」嗰張。</div>
         <label class="li" style="gap:10px"><span class="grow">同尾號認唔到時，優先用呢張卡</span><span class="switch"><input type="checkbox" id="c-pref" ${d.l4Pref?'checked':''}><span></span></span></label></div>`:''})()}
-      ${d.type==='credit'?`<div class="row2"><label class="field"><span>結單日（截數日）</span><select id="c-stmt"><option value="">未設定</option>${Array.from({length:31},(_,i)=>`<option value="${i+1}" ${+d.stmtDay===i+1?'selected':''}>每月 ${i+1} 號</option>`).join('')}</select></label><label class="field"><span>到期還款日</span><select id="c-due"><option value="">未設定</option>${Array.from({length:31},(_,i)=>`<option value="${i+1}" ${+d.dueDay===i+1?'selected':''}>${i+1} 號</option>`).join('')}</select></label></div>
-      <label class="field"><span>到期還款日喺結單日嘅</span><select id="c-duem">${(()=>{const cur=d.dueMonth||((+d.dueDay&&+d.stmtDay&&+d.dueDay>+d.stmtDay)?'same':'next');return[['same','同一個月（例：10/2 結單 → 10/25 到期）'],['next','下一個月（例：10/16 結單 → 11/11 到期）']].map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('')})()}</select></label>
-      <div class="small faint">例如結單日 16 號、到期還款日 11 號、揀「下一個月」：10 月 16 日嗰期要喺 11 月 11 日前還。預計還款 ＝ 上期結單日之後到今期結單日（包括當日）嘅簽賬減退款，唔計結單前後入賬嘅差異。</div>`:''}
+      ${d.type==='credit'?(()=>{const rule=d.stmtRule||'fixed';return`<label class="field"><span>還款日計法</span><select id="c-srule">${Object.entries(STMT_RULE).map(([k,l])=>`<option value="${k}" ${rule===k?'selected':''}>${l}</option>`).join('')}</select></label>
+      <div class="row2"><label class="field"><span>結單日（截數日）</span><select id="c-stmt"><option value="">未設定</option>${Array.from({length:31},(_,i)=>`<option value="${i+1}" ${+d.stmtDay===i+1?'selected':''}>每月 ${i+1} 號</option>`).join('')}</select></label>${rule==='fixed'?`<label class="field"><span>到期還款日</span><select id="c-due"><option value="">未設定</option>${Array.from({length:31},(_,i)=>`<option value="${i+1}" ${+d.dueDay===i+1?'selected':''}>${i+1} 號</option>`).join('')}</select></label>`:'<div></div>'}</div>
+      ${rule==='fixed'?`<label class="field"><span>到期還款日喺結單日嘅</span><select id="c-duem">${(()=>{const cur=d.dueMonth||((+d.dueDay&&+d.stmtDay&&+d.dueDay>+d.stmtDay)?'same':'next');return[['same','同一個月（例：10/2 結單 → 10/25 到期）'],['next','下一個月（例：10/16 結單 → 11/11 到期）']].map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('')})()}</select></label>
+      <div class="small faint">例如結單日 16 號、到期還款日 11 號、揀「下一個月」：10 月 16 日嗰期要喺 11 月 11 日前還。</div>`
+      :rule==='hsbc'?`<div class="small faint">滙豐／恒生：截數日如果係星期日就順延到星期一；還款日 ＝ 截數日＋26 日，遇星期六、日或公眾假期順延到下一個工作天。</div>`
+      :`<div class="small faint">中銀：截數日唔會順延（星期日都照截）；還款日 ＝ 截數日＋26 日，遇星期六、日或公眾假期順延到下一個工作天。</div>`}
+      <div class="small faint">截數日同還款日只係估算，可能同實際差幾日；計唔準時寧願估早啲。預計還款 ＝ 上期截數日之後到今期截數日（包括當日）嘅簽賬減退款。</div>`})():''}
       ${d.type==='octopus'?(()=>{const A=octoDefaults(d);return`<h3 style="margin-top:6px">八達通餘額計算</h3>
       <div class="small muted">iPhone 收到「新餘額」通知時，會同上次餘額比較：減少 ＝ 支出，增加 ＝ 增值。</div>
       <div class="row2"><label class="field"><span>自動增值</span><select id="o-on"><option value="1" ${A.on?'selected':''}>有</option><option value="0" ${A.on?'':'selected'}>冇</option></select></label><label class="field"><span>每次自動增值金額（HK$）</span><input id="o-amt" inputmode="decimal" value="${esc(A.amt)}" ${A.on?'':'disabled'}></label></div>
@@ -1827,15 +1844,16 @@ function openCard(id){
         <div class="field"><span>額外回贈只限以下分類（唔揀 ＝ 全部）</span>${chips(R.extraCats,c=>`data-ec="${esc(c)}"`)}</div>`
       :`<div class="small muted">唔同分類有唔同回贈，例如餐飲 4%、衣服零售 5%。超出上限或者唔屬於任何規則嘅交易，用基本回贈計。分類由 app 自動判斷，計回贈前會叫你核對。</div>
         <label class="field"><span>基本回贈 %（其他交易）</span><input id="c-base" inputmode="decimal" value="${esc(R.basePct)}"></label>
-        ${R.catRules.map((r,i)=>`<div class="review"><div class="card-head"><b>規則 ${i+1}</b><button class="icon-btn" type="button" data-rr="${i}" aria-label="移除規則 ${i+1}">✕</button></div>${chips(r.cats||[],c=>`data-rc="${i}" data-c="${esc(c)}"`)}<div class="row2"><label class="field"><span>回贈 %</span><input data-rp="${i}" inputmode="decimal" value="${esc(r.pct)}"></label><label class="field"><span>${R.capPeriod==='year'?'每年':'每月'}簽賬上限（留空 ＝ 無）</span><input data-rcap="${i}" inputmode="decimal" value="${esc(r.cap??'')}"></label></div></div>`).join('')}
+        ${R.catRules.map((r,i)=>`<div class="review"><div class="card-head"><b>規則 ${i+1}</b><button class="icon-btn" type="button" data-rr="${i}" aria-label="移除規則 ${i+1}">✕</button></div>${chips(r.cats||[],c=>`data-rc="${i}" data-c="${esc(c)}"`)}${i>0?`<label class="li" style="gap:10px;padding:6px 0"><span class="grow small">同上一條規則合併計算簽賬上限（例如全年合共 $100,000）</span><span class="switch"><input type="checkbox" data-rsh="${i}" ${r.share?'checked':''}><span></span></span></label>`:''}<div class="row2"><label class="field"><span>回贈 %</span><input data-rp="${i}" inputmode="decimal" value="${esc(r.pct)}"></label>${i>0&&r.share?`<div class="field"><span>簽賬上限</span><div class="small muted" style="padding-top:10px">同規則 ${(()=>{let h=i;while(h>0&&R.catRules[h].share)h--;return h+1})()} 合併計算</div></div>`:`<label class="field"><span>${R.capPeriod==='year'?'每年':'每月'}簽賬上限（留空 ＝ 無）${R.catRules.some((x,j)=>j>i&&x.share)?'・合併上限':''}</span><input data-rcap="${i}" inputmode="decimal" value="${esc(r.cap??'')}"></label>`}</div></div>`).join('')}
         <button class="btn sm line" type="button" id="c-addrule">＋ 加一條分類規則</button>`}
       <div class="err" id="c-err" hidden></div>
       <div class="actions"><button class="btn" type="button" id="c-save">儲存</button>${isNew?'':'<button class="btn danger" type="button" id="c-del">刪除卡</button>'}</div>`,()=>{
         const val=q=>{const e=document.querySelector(q);return e?e.value.trim():''};
-        const grab=()=>{if($('#rv-m'))R.from=`${$('#rv-y').value}-${pad($('#rv-m').value)}`;if($('#o-on')){const A=octoDefaults(d);A.on=$('#o-on').value==='1';A.amt=num($('#o-amt').value)||0;A.cat=$('#o-cat').value;const b=$('#o-bal').value.trim();if(b!==''&&!isNaN(num(b))&&(!d.octoBal||num(b)!==d.octoBal.bal))d.octoBal={bal:num(b),ts:fmtLocal(new Date())}}R.resetDay=+$('#c-reset').value||1;if($('#c-per')){R.capPeriod=$('#c-per').value;if($('#c-ys'))R.yearStart=+$('#c-ys').value||1}if($('#c-stmt')){d.stmtDay=+$('#c-stmt').value||null;d.dueDay=+$('#c-due').value||null;d.dueMonth=$('#c-duem').value}d.name=$('#c-name').value;d.type=$('#c-type').value;d.collect=$('#c-col').checked;d.keywords=$('#c-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);if($('#c-pref'))d.l4Pref=$('#c-pref').checked;
+        const grab=()=>{if($('#rv-m'))R.from=`${$('#rv-y').value}-${pad($('#rv-m').value)}`;if($('#o-on')){const A=octoDefaults(d);A.on=$('#o-on').value==='1';A.amt=num($('#o-amt').value)||0;A.cat=$('#o-cat').value;const b=$('#o-bal').value.trim();if(b!==''&&!isNaN(num(b))&&(!d.octoBal||num(b)!==d.octoBal.bal))d.octoBal={bal:num(b),ts:fmtLocal(new Date())}}R.resetDay=+$('#c-reset').value||1;if($('#c-per')){R.capPeriod=$('#c-per').value;if($('#c-ys'))R.yearStart=+$('#c-ys').value||1}if($('#c-stmt')){d.stmtDay=+$('#c-stmt').value||null;d.stmtRule=$('#c-srule').value;if($('#c-due')){d.dueDay=+$('#c-due').value||null;d.dueMonth=$('#c-duem').value}}d.name=$('#c-name').value;d.type=$('#c-type').value;d.collect=$('#c-col').checked;d.keywords=$('#c-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);if($('#c-pref'))d.l4Pref=$('#c-pref').checked;
           if(R.mode==='tier')R.tiers.forEach((t,i)=>{const l=val(`[data-tl="${i}"]`);t.limit=l===''?'':num(l);t.pct=num(val(`[data-tp="${i}"]`))||0});
           else if(R.mode==='split'){R.basePct=num(val('#c-base'))||0;R.extraPct=num(val('#c-extra'))||0;const c=val('#c-cap');R.extraCap=c===''?'':num(c)}
           else{R.basePct=num(val('#c-base'))||0;R.catRules.forEach((r,i)=>{r.pct=num(val(`[data-rp="${i}"]`))||0;const c=val(`[data-rcap="${i}"]`);r.cap=c===''?'':num(c)})}};
+        {const sr=$('#c-srule');if(sr)sr.onchange=()=>{grab();draw()}}
         $('#c-per').onchange=()=>{grab();if(R.capPeriod==='year'&&!R.yearStart)R.yearStart=1;draw()};
         $('#c-type').onchange=()=>{grab();if(d.type==='octopus')octoDefaults(d);draw()};
         $('#rv-sel').onchange=()=>{grab();const v=$('#rv-sel').value;if(v==='new'){const nv=JSON.parse(JSON.stringify(d.rebates[d.rebates.length-1]));nv.from=curMonth();d.rebates.push(nv);vi=d.rebates.length-1}else vi=+v;R=d.rebates[vi];draw()};
@@ -1845,7 +1863,8 @@ function openCard(id){
         document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{grab();R.tiers.splice(+b.dataset.rm,1);draw()});
         const at=$('#c-addtier');if(at)at.onclick=()=>{grab();R.tiers.push({limit:'',pct:0});draw()};
         const ar=$('#c-addrule');if(ar)ar.onclick=()=>{grab();R.catRules.push({cats:[],pct:0,cap:''});draw()};
-        document.querySelectorAll('[data-rr]').forEach(b=>b.onclick=()=>{grab();R.catRules.splice(+b.dataset.rr,1);draw()});
+        document.querySelectorAll('[data-rr]').forEach(b=>b.onclick=()=>{grab();R.catRules.splice(+b.dataset.rr,1);if(R.catRules[0])delete R.catRules[0].share;draw()});
+        document.querySelectorAll('[data-rsh]').forEach(b=>b.onchange=()=>{grab();R.catRules[+b.dataset.rsh].share=b.checked;draw()});
         document.querySelectorAll('[data-ec]').forEach(b=>b.onclick=()=>{const c=b.dataset.ec;const i=R.extraCats.indexOf(c);i<0?R.extraCats.push(c):R.extraCats.splice(i,1);b.setAttribute('aria-pressed',i<0)});
         document.querySelectorAll('[data-rc]').forEach(b=>b.onclick=()=>{const r=R.catRules[+b.dataset.rc];r.cats=r.cats||[];const c=b.dataset.c;const i=r.cats.indexOf(c);i<0?r.cats.push(c):r.cats.splice(i,1);b.setAttribute('aria-pressed',i<0)});
         $('#c-save').onclick=()=>{grab();if(!d.name.trim())return errIn('c-err')('請填卡名');
