@@ -245,7 +245,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.18-51';
+const APP_VERSION='2026.10.18-52';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -385,6 +385,7 @@ function migrateSched(x,isBill){
 function migrate(s){
   if(s.settings&&s.settings.mailBlock==null)s.settings.mailBlock='moneyhero, moneysmart';
   if(s.settings&&s.settings.smsBlock==null)s.settings.smsBlock='';
+  if(s.settings&&s.settings.notifBlock==null)s.settings.notifBlock='';
   (s.cards||[]).forEach(c=>{if(!Array.isArray(c.rebates)||!c.rebates.length)c.rebates=[{...(c.rebate||{mode:'tier',tiers:[{limit:'',pct:0}]}),from:'2000-01'}];c.rebates.sort((a,b)=>a.from<b.from?-1:1);c.rebate=c.rebates[c.rebates.length-1]});
   if(!Array.isArray(s.trash))s.trash=[];
   {const lim=fmtLocal(new Date(Date.now()-60*864e5));s.trash=s.trash.filter(x=>x.at>=lim)}
@@ -924,7 +925,11 @@ function openSender(k){
     <div class="seg" role="group" aria-label="名單">${[['w','白名單'],['','未決定'],['b','黑名單']].map(([st,l])=>`<button type="button" data-act="ms-set" data-k="${esc(k)}" data-st="${st}" aria-pressed="${(v.st||'')===st}">${l}</button>`).join('')}</div>
     <div class="small muted" style="margin-top:8px">黑名單：以後自動略過，舊記錄移去垃圾筒。白名單：佢嘅收入唔使再核實。</div>`);
 }
-function smsBlocked(text){const list=String((S.settings||{}).smsBlock||'').split(/[,，]/).map(x=>x.trim().toLowerCase()).filter(Boolean);const t=String(text).toLowerCase();return list.some(w=>t.includes(w))}
+// App 通知：逐條判斷，內容有略過字眼先會略過嗰一條（唔會封鎖成個 App）
+function notifBlocked(text){const list=String((S.settings||{}).notifBlock||'').split(/[,，、\n]/).map(x=>x.trim().toLowerCase()).filter(Boolean);if(!list.length)return false;const t=String(text).toLowerCase().replace(/\s+/g,'');return list.some(w=>t.includes(w.replace(/\s+/g,'')))}
+function cleanBlockedNotif(){let n=0;S.txns=S.txns.filter(t=>{if((t.sources||[t.source]).every(x=>x==='notif')&&(t.raw||[]).some(notifBlocked)){trashPut('txn',t,{reason:'通知略過字眼'});n++;return false}return true});
+  S.incomeEntries=S.incomeEntries.filter(e=>{if(e.src==='notif'&&(e.raw||[]).some(notifBlocked)){trashPut('income',e,{reason:'通知略過字眼'});n++;return false}return true});return n}
+function smsBlocked(text){const list=String((S.settings||{}).smsBlock||'').split(/[,，、\n]/).map(x=>x.trim().toLowerCase()).filter(Boolean);const t=String(text).toLowerCase();return list.some(w=>t.includes(w))}
 function cleanBlockedSms(){let n=0;S.txns=S.txns.filter(t=>{if((t.sources||[t.source]).every(x=>x==='sms')&&(t.raw||[]).some(smsBlocked)){trashPut('txn',t,{reason:'短訊略過字眼'});n++;return false}return true});
   S.incomeEntries=S.incomeEntries.filter(e=>{if(e.src==='sms'&&(e.raw||[]).some(smsBlocked)){trashPut('income',e,{reason:'短訊略過字眼'});n++;return false}return true});return n}
 function producedBy(line){const hit=x=>x&&(x===line||line.includes(x));return S.txns.concat(S.trash.filter(e=>e.kind==='txn').map(e=>e.item)).some(t=>(t.raw||[]).some(hit))||S.incomeEntries.some(e=>(e.raw||[]).some(hit))}
@@ -943,6 +948,7 @@ function importText(text,opts={}){
       if(!S.channels[src]){res.skipped++;continue}
       const ts=parseTime(r.parts[1])||fmtLocal(new Date());
       if(src==='mail'&&mailBlocked(r.line)){res.skipped++;continue}
+      if(src==='notif'&&notifBlocked(r.line)){res.skipped++;continue}
       if(src==='mail'){const bk=parseBankMail(r.parts.slice(2).join(' ¦ '));
         if(bk){if(bk.skip){res.skipped++;continue}S.imported[h]=1;if(bk.type==='income'){routeIncome({ts,amount:bk.amount,name:bk.merchant,src:'mail',raw:r.line},res,r.line);continue}ingest({ts,amount:bk.amount,merchant:bk.merchant,channel:bk.channel,type:bk.type,source:'mail'},r.line,res);continue}}
       const items=parseNotifs(r.parts.slice(2).join(' ¦ '),src==='mail');
@@ -1469,6 +1475,8 @@ function renderCards(){
       <div class="small faint" style="margin-bottom:6px">每封放入收件箱嘅電郵都會記低寄件人。黑名單：以後自動略過，舊記錄移去垃圾筒。白名單：佢嘅收入唔使再核實。未決定：收入要你逐筆確認。</div>
       <div class="list">${L.map(([k,v])=>`<div class="li" style="flex-wrap:wrap;gap:6px"><button type="button" class="grow" data-act="ms-open" data-k="${esc(k)}" style="min-width:0;background:none;border:0;padding:0;text-align:left;color:inherit;font:inherit"><span class="t" style="display:block;overflow-wrap:anywhere">${esc(v.name||v.dom)} <span class="faint" aria-hidden="true">›</span></span><span class="m" style="overflow-wrap:anywhere">${esc(v.addr||'@'+v.dom+'（舊記錄，整個網域）')} · ${v.n} 封${v.last?` · 最近 ${+v.last.slice(5,7)}/${+v.last.slice(8,10)}`:''} · 撳入去睇標題</span></button>
         <span class="seg" role="group" aria-label="名單" style="margin:0;flex:1 1 100%">${[['w','白名單'],['','未決定'],['b','黑名單']].map(([st,l])=>`<button type="button" data-act="ms-set" data-k="${esc(k)}" data-st="${st}" aria-pressed="${(v.st||'')===st}">${l}</button>`).join('')}</span></div>`).join('')}</div></details>`})()}
+    <label class="field"><span>App 通知：包含以下字眼就略過嗰一條（廣告／推廣，用逗號分隔）</span><input id="notif-block" value="${esc(S.settings.notifBlock||'')}" placeholder="例如：優惠, 推廣, 獎賞, 限時, 抽獎"></label>
+    <div class="small faint">逐條通知判斷：只係內容有呢啲字嘅通知先會略過，同一個 App 嘅其他付款通知照記。</div>
     <label class="field"><span>短訊：包含以下字眼就略過（推廣／詐騙，用逗號分隔）</span><input id="sms-block" value="${esc(S.settings.smsBlock||'')}" placeholder="例如：優惠, 推廣, 中獎, 點擊連結, 貸款"></label>
     <label class="field"><span>Apple Pay 同短訊合併時間範圍</span><select id="merge-h">${[2,6,12,24,48].map(h=>`<option value="${h}" ${S.settings.mergeHours===h?'selected':''}>${h} 小時內同金額就當係同一筆候選</option>`).join('')}</select></label>
   </div>
@@ -1528,6 +1536,7 @@ function renderCards(){
   </div>`;
   document.querySelectorAll('[data-ch]').forEach(i=>i.onchange=()=>{S.channels[i.dataset.ch]=i.checked;save();toast(i.checked?'已開啟收集':'已停止收集')});
   $('#mail-block').onchange=e=>{S.settings.mailBlock=e.target.value;const n=cleanBlockedMail();save();render();toast(n?`已儲存，${n} 筆推廣電郵記錄移咗去垃圾筒`:'已儲存')};
+  $('#notif-block').onchange=e=>{S.settings.notifBlock=e.target.value;const n=cleanBlockedNotif();save();render();toast(n?`已儲存，${n} 筆通知記錄移咗去垃圾筒`:'已儲存')};
   $('#sms-block').onchange=e=>{S.settings.smsBlock=e.target.value;const n=cleanBlockedSms();save();render();toast(n?`已儲存，${n} 筆短訊記錄移咗去垃圾筒`:'已儲存')};
   $('#merge-h').onchange=e=>{S.settings.mergeHours=+e.target.value;save();toast('已更新合併範圍')};
   arm($('#wipe'),()=>{const k=S.inboxSince;S=blankState();S.inboxSince=k;save();ui.month=curMonth();render();toast('已清除所有資料')},'再按一次：清除所有資料');
