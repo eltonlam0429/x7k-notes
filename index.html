@@ -247,7 +247,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.26-55';
+const APP_VERSION='2026.10.26-56';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -311,6 +311,26 @@ function userCat(text){
     const hit=/^[a-z0-9&'\-. ]+$/.test(w0)&&w2.length<=4?new RegExp('(^|[^a-z0-9])'+escRe(w0)+'([^a-z0-9]|$)').test(raw):t.includes(w2);
     if(hit&&w2.length>bl){best=k;bl=w2.length}}
   return best&&CAT_NAMES.includes(best)?best:null;
+}
+const kwList=k=>String(((S.settings||{}).catKw||{})[k]||'').split(/[,，、\n]/).map(x=>x.trim()).filter(Boolean);
+// 分類關鍵字：大格輸入（一行一個，或者用逗號分隔）
+function openKwEdit(k){
+  openSheet(`分類關鍵字 · ${k}`,`<div class="small muted">一行一個字眼，或者用逗號分隔都得。</div>
+    <textarea id="ckw-text" style="width:100%;min-height:58vh;font-size:16px;line-height:1.6;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--surface)" autocapitalize="off" autocorrect="off" spellcheck="false">${esc(kwList(k).join('\n'))}</textarea>
+    <div class="actions"><button class="btn" type="button" id="ckw-save">儲存</button><button class="btn line" type="button" data-close>取消</button></div>`,()=>{
+    $('#sheet [data-close].btn').onclick=()=>{closeSheet();render()};
+    $('#ckw-save').onclick=()=>{const L=[...new Set($('#ckw-text').value.split(/[,，、\n]/).map(x=>x.trim()).filter(Boolean))];S.settings.catKw=S.settings.catKw||{};if(L.length)S.settings.catKw[k]=L.join(', ');else delete S.settings.catKw[k];save();closeSheet();render();toast(`已儲存 ${L.length} 個字眼，可以撳「重新自動分類」套用落舊記錄`)}});
+}
+// 重新自動分類：只改冇手動改過分類嘅記錄；判斷唔到（其他）就唔郁
+const isCatManual=t=>t.catManual||t.catChecked||isDesig(t.category);
+function recatRange(mode){const a=todayKey();if(mode==='all')return null;const r=range(mode,a);return[fmtLocal(r.s),fmtLocal(r.e)]}
+function recatPreview(mode){const R=recatRange(mode);return S.txns.filter(t=>(t.type==='expense'||t.type==='refund')&&!isCatManual(t)&&(!R||(t.ts>=R[0]&&t.ts<R[1]))).map(t=>({t,c:categorize(t.merchant)})).filter(x=>x.c!=='其他'&&x.c!==x.t.category)}
+function openRecat(){
+  const M=[['week','本周'],['month','本月'],['quarter','本季'],['year','本年'],['all','全部']];
+  openSheet('重新自動分類',`<div class="small muted">用而家嘅分類關鍵字，重新判斷<b>冇手動改過分類</b>嘅支出。你手動改過、核對過或者揀咗指定類別嘅記錄唔會郁；判斷唔到嘅照舊。</div>
+    <div class="list">${M.map(([k,l])=>{const n=recatPreview(k).length;return`<button class="li" type="button" data-rc-go="${k}" ${n?'':'disabled'}><span class="grow"><span class="t" style="display:block">${l}</span><span class="m">${n?`${n} 筆會改分類`:'冇需要改'}</span></span><span class="faint">›</span></button>`}).join('')}</div>`,()=>{
+    document.querySelectorAll('[data-rc-go]').forEach(b=>b.onclick=()=>{const L=recatPreview(b.dataset.rcGo);L.forEach(x=>x.t.category=x.c);save();closeSheet();render();toast(`已重新分類 ${L.length} 筆`)});
+  });
 }
 function categorize(text){
   const rule=S.rules[normMerchant(text)]; if(rule) return rule;
@@ -1544,7 +1564,7 @@ function renderRecords(){
     <div class="sum-line"><div><div class="small muted">${label}支出</div><div class="v num">${money(exp)}</div></div><div class="small muted" style="text-align:right">${tx.filter(isExp).length} 筆${ref?` · 退款 ${money(ref)}`:''}${unv.length?`<br>另有 ${unv.length} 筆待核實 ${money(sum(unv.filter(isExp)))}（未計入）`:''}</div></div>
     <div class="list">${body}</div>
   </div>`;
-  document.querySelectorAll('[data-act="rev-cat"]').forEach(s=>s.onchange=()=>{const r=S.reviews.find(x=>x.id===s.dataset.id);[r.a,r.b].forEach(id=>{const t=S.txns.find(x=>x.id===id);if(t){t.category=s.value;t.catChecked=true}});save();toast('已改分類')});
+  document.querySelectorAll('[data-act="rev-cat"]').forEach(s=>s.onchange=()=>{const r=S.reviews.find(x=>x.id===s.dataset.id);[r.a,r.b].forEach(id=>{const t=S.txns.find(x=>x.id===id);if(t){t.category=s.value;t.catChecked=true;t.catManual=true}});save();toast('已改分類')});
 }
 function resolveReview(id,same){
   const r=S.reviews.find(x=>x.id===id);if(!r)return;const a=S.txns.find(t=>t.id===r.a),b=S.txns.find(t=>t.id===r.b);
@@ -1684,15 +1704,10 @@ function renderAnalysis(){
   <div class="card"><div class="sum-line"><div><div class="small muted">總支出（扣除退款）</div><div class="v num">${money(total)}</div></div><div style="text-align:right">${delta(total,ptotal)}<div class="small faint">對比上一個${MODE_L[mode]} ${money(ptotal)}</div></div></div>
     <div class="list">${rows.length?rows.map(c=>{const v=cur.o[c];return`<button class="cat-row" type="button" data-act="ana-cat" data-cat="${esc(c)}" style="--cc:${catColor(c)}"><span>${catChip(c)} <span class="small faint">${v.n} 筆 · ${total?Math.round(Math.max(0,v.amt)/total*100):0}%</span></span><span style="text-align:right"><b class="num">${money(v.amt)}</b> ${delta(v.amt,prev[c].amt)}</span><span class="track"><i style="width:${Math.max(0,v.amt)/top*100}%"></i></span></button>`}).join(''):'<div class="empty">呢段時間冇支出</div>'}</div>
   </div>
-  <details class="card"><summary style="cursor:pointer"><b>分類關鍵字</b> <span class="small muted">（撳開設定）</span></summary>
-    <div class="small muted" style="margin:6px 0">商戶名包含呢啲字就自動歸入該分類，用逗號分隔。唔理空格同大細楷：填「food panda」都會認到「foodpanda」。你填嘅字眼優先過內置判斷；你手動改過分類嘅商戶會記住，唔受影響。</div>
-    ${CATS.filter(c=>c.k!=='其他').map(c=>`<label class="field"><span><span class="cat-chip" style="--cc:${c.c};font-weight:600">${esc(c.k)}</span></span><input data-ckw="${esc(c.k)}" value="${esc(((S.settings.catKw||{})[c.k])||'')}" placeholder="例如：${esc(c.kw.length?c.kw.slice(0,3).join(', '):'店鋪名')}" autocapitalize="off" autocorrect="off"></label>`).join('')}
-  </details>${detail}`;
-  document.querySelectorAll('[data-ckw]').forEach(i=>i.onchange=()=>{
-    S.settings.catKw=S.settings.catKw||{};const v=i.value.trim();if(v)S.settings.catKw[i.dataset.ckw]=v;else delete S.settings.catKw[i.dataset.ckw];
-    // 重新判斷「其他」同未核實嘅記錄
-    let n=0;for(const t of S.txns){if(t.type!=='expense'&&t.type!=='refund')continue;if(t.category!=='其他'&&t.status==='confirmed')continue;const c=categorize(t.merchant);if(c!==t.category){t.category=c;n++}}
-    save();const op=i.closest('details');render();const d=document.querySelector('#tab-analysis details');if(d&&op)d.open=true;toast(n?`已儲存，${n} 筆記錄重新分類`:'已儲存')});
+  <div class="card"><div class="card-head"><h3>分類關鍵字</h3><button class="btn sm" type="button" data-act="recat">重新自動分類</button></div>
+    <div class="small muted">商戶名包含呢啲字就自動歸入該分類。撳分類打開大格修改。唔理空格同大細楷；4 個字母或以下嘅英文字要成個字對得上。</div>
+    <div class="list">${CAT_NAMES.filter(k=>k!=='其他').map(k=>{const L=kwList(k);return`<button class="li" type="button" data-act="ckw-edit" data-k="${esc(k)}"><span class="grow" style="min-width:0">${catChip(k)} <span class="small faint">${L.length} 個字眼</span><span class="m" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(L.slice(0,12).join('、'))||'（未有）'}</span></span><span class="faint">›</span></button>`}).join('')}</div>
+  </div>${detail}`;
 }
 
 /* 表單元件：日期（先年後月，日子可以唔揀）、周期、結束 */
@@ -1788,7 +1803,7 @@ function openEditTx(id){
       $('#f-save').onclick=()=>{
         const amt=num($('#f-amt').value);if(!(amt>0))return errIn('f-err')('請輸入大過 0 嘅金額');
         const d=readDate('f-date');const noDay=d.length===7;
-        if($('#f-ch').value!==t.channel)t.chEdited=true;
+        if($('#f-ch').value!==t.channel)t.chEdited=true;if($('#f-cat').value!==t.category)t.catManual=true;
         Object.assign(t,{ts:noDay?`${d}-01T00:00`:`${d}T${$('#f-time').value||'12:00'}`,noDay,amount:r2(amt),merchant:$('#f-mer').value.trim(),category:$('#f-cat').value,channel:$('#f-ch').value,type:$('#f-type').value,status:$('#f-st').value,note:$('#f-note').value.trim(),catChecked:true});
         delete t.suggestTpl;delete t.suggestBill;
         if(t.type==='income'&&$('#f-tpl').value){const T=S.incomeTemplates.find(x=>x.id===$('#f-tpl').value);const M=payMonth(t.ts);t.linkTpl=T.id;t.linkMonth=M;
@@ -2072,7 +2087,7 @@ function openCatCheck(id){
     openSheet(`核對分類 · ${c.name}`,`<div class="small muted">呢張卡嘅回贈按分類計。以下交易嘅分類係自動判斷，請確認或者改正，回贈先會計得準。</div>
       ${list.length?`<div class="list">${list.map(t=>`<div class="li" style="flex-wrap:wrap"><span class="grow"><span class="t" style="display:block">${esc(t.merchant)}</span><span class="m">${t.noDay?'未指定日子':`${+t.ts.slice(5,7)}/${+t.ts.slice(8,10)} ${t.ts.slice(11,16)}`} · ${money(t.amount)}</span></span><select data-cc="${esc(t.id)}" aria-label="分類">${catOptions(t.category,c.id)}</select><button class="btn sm ghost" type="button" data-ok="${esc(t.id)}">啱</button></div>`).join('')}</div>
       <div class="actions"><button class="btn" type="button" id="cc-all">全部確認（${list.length} 筆）</button></div>`:'<div class="empty">全部已核對，回贈已按分類計好。</div>'}`,()=>{
-        document.querySelectorAll('[data-cc]').forEach(sel=>sel.onchange=()=>{const t=S.txns.find(x=>x.id===sel.dataset.cc);if(t){t.category=sel.value;t.catChecked=true;save();draw();toast('已改分類')}});
+        document.querySelectorAll('[data-cc]').forEach(sel=>sel.onchange=()=>{const t=S.txns.find(x=>x.id===sel.dataset.cc);if(t){t.catManual=true;t.category=sel.value;t.catChecked=true;save();draw();toast('已改分類')}});
         document.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>{const t=S.txns.find(x=>x.id===b.dataset.ok);if(t){t.catChecked=true;save();draw()}});
         const all=$('#cc-all');if(all)all.onclick=()=>{list.forEach(t=>{const x=S.txns.find(y=>y.id===t.id);if(x)x.catChecked=true});save();closeSheet();render();toast('已全部確認')};
       });};
@@ -2108,6 +2123,8 @@ document.addEventListener('click',e=>{
   else if(a==='edit-income')openIncome(b.dataset.id,b.dataset.src);
   else if(a==='add-bill')openExpense('rec');
   else if(a==='edit-bill')openBill(b.dataset.id);
+  else if(a==='ckw-edit')openKwEdit(b.dataset.k);
+  else if(a==='recat')openRecat();
   else if(a==='fx-del'||a==='fx-restore'){const L=b.dataset.k==='bill'?S.bills:S.incomeTemplates;const x=L.find(y=>y.id===b.dataset.id);if(!x)return;if(a==='fx-del')x.deleted=true;else delete x.deleted;save();render();toast(a==='fx-del'?'已移去「已刪除」，喺總覽最底可以復原':'已復原')}
   else if(a==='fx-purge'){if(b.dataset.armed!=='1'){b.dataset.armed='1';b.textContent='再按一次確認';setTimeout(()=>{if(b.isConnected){b.dataset.armed='';b.textContent='永久刪除'}},3000);return}
     if(b.dataset.k==='bill'){S.bills=S.bills.filter(y=>y.id!==b.dataset.id);delete S.billOverrides[b.dataset.id]}else{S.incomeTemplates=S.incomeTemplates.filter(y=>y.id!==b.dataset.id);delete S.incomeOverrides[b.dataset.id]}save();render();toast('已永久刪除')}
