@@ -247,7 +247,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.25-54';
+const APP_VERSION='2026.10.26-55';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -305,7 +305,11 @@ function normMerchant(s){
 function userCat(text){
   const ck=(S.settings||{}).catKw||{};const t=String(text||'').toLowerCase().replace(/\s+/g,'');if(!t)return null;
   let best=null,bl=0;
-  for(const k of Object.keys(ck))for(const w of String(ck[k]||'').split(/[,，、]/)){const w2=w.toLowerCase().replace(/\s+/g,'');if(w2&&t.includes(w2)&&w2.length>bl){best=k;bl=w2.length}}
+  const raw=String(text||'').toLowerCase();
+  for(const k of Object.keys(ck))for(const w of String(ck[k]||'').split(/[,，、\n]/)){const w0=w.trim().toLowerCase(),w2=w0.replace(/\s+/g,'');if(!w2)continue;
+    // 4 個字母或以下嘅英文字（例如 gu、cos、kmb）要成個字對得上，避免 COSTCO 當咗 COS
+    const hit=/^[a-z0-9&'\-. ]+$/.test(w0)&&w2.length<=4?new RegExp('(^|[^a-z0-9])'+escRe(w0)+'([^a-z0-9]|$)').test(raw):t.includes(w2);
+    if(hit&&w2.length>bl){best=k;bl=w2.length}}
   return best&&CAT_NAMES.includes(best)?best:null;
 }
 function categorize(text){
@@ -410,6 +414,8 @@ function migrate(s){
   (s.bills||[]).forEach(b=>migrateSched(b,true));
   (s.incomeTemplates||[]).forEach(t=>migrateSched(t,false));
   (s.cards||[]).forEach(c=>{if(!c.rebate)c.rebate={mode:'tier',tiers:[{limit:'',pct:0}]};const R=c.rebate;if(!R.tiers)R.tiers=[{limit:'',pct:0}];if(!R.extraCats)R.extraCats=[];if(!R.catRules)R.catRules=[];if(R.basePct==null)R.basePct=0;if(!R.resetDay)R.resetDay=1;if(c.type==='octopus')octoDefaults(c)});
+  // 分類關鍵字：第一次將內置例子填入，你可以再加或者刪
+  if(s.settings&&!s.settings.catKwSeeded){s.settings.catKw=s.settings.catKw||{};CATS.forEach(c=>{if(!c.kw.length)return;const have=String(s.settings.catKw[c.k]||'').split(/[,，、\n]/).map(x=>x.trim()).filter(Boolean);const add=c.kw.filter(w=>!have.some(h=>h.toLowerCase()===w.toLowerCase()));s.settings.catKw[c.k]=[...have,...add].join(', ')});s.settings.catKwSeeded=true}
   return s;
 }
 function hydrate(o){return migrate(Object.assign(blankState(),o))}
@@ -633,6 +639,9 @@ const chRank=ch=>!ch||GENERIC_CH.has(ch)?0:['bank','fps','autopay'].includes(ch)
 const chCompatible=(a,b)=>a===b||chRank(a)<=1||chRank(b)<=1;
 // 同一筆有兩個來源：用較詳細嗰個（同樣詳細就以電郵為準）
 function betterInfo(c,t){
+  // 用信用卡增值 PayMe 等：保留 PayMe 做名稱，但渠道用嗰張信用卡（增值途徑），唔計支出、計入卡數
+  if(c.type==='transfer'&&!c.chEdited){const cardOf=x=>S.cards.some(k=>k.id===x&&k.type==='credit');const src=cardOf(t.channel)?t.channel:cardOf(c.channel)?c.channel:null;
+    if(src){const wal=[c,t].map(x=>PAY_APP.find(p=>p[1]===x.channel||p[0].test(x.merchant||''))).find(Boolean);c.channel=src;c.byL4=c.byL4||t.byL4;if(wal)c.merchant=`${wal[2]} 增值`;if(!/增值途徑/.test(c.note||''))c.note=((c.note?c.note+'；':'')+`增值途徑：${chName(src)}`);return}}
   if(!c.chEdited&&!c.byL4&&t.channel&&t.channel!==c.channel){const a=chRank(c.channel),b=chRank(t.channel);if(b>a||(b===a&&b>0&&t.source==='mail'))c.channel=t.channel}
   if(t.merchant&&!GENERIC_MER.test(t.merchant)&&(!c.merchant||GENERIC_MER.test(c.merchant)||t.source==='mail')){const was=c.merchant;c.merchant=t.merchant;if(was!==c.merchant&&c.category==='其他'&&!c.catChecked)c.category=categorize(c.merchant)}
 }
@@ -782,11 +791,16 @@ function addIncomeAuto(e,res){
   const W=S.settings.mergeHours;
   const dup=S.txns.find(x=>x.type==='income'&&!x.linkTpl&&Math.abs(x.amount-e.amount)<0.005&&Math.abs(toDate(x.ts)-toDate(e.ts))/36e5<=W&&(!(x.sources||[x.source]).includes(e.src)||(merchantSim(x.merchant,e.name)>=0.8&&Math.abs(toDate(x.ts)-toDate(e.ts))/36e5<=0.25)));
   if(dup){dup.raw=[...(dup.raw||[]),e.raw];dup.sources=[...new Set([...(dup.sources||[dup.source]),e.src])];if(res)res.merged++;return dup}
-  const n={id:uid(),ts:e.ts,amount:r2(e.amount),merchant:e.name,category:'其他',channel:'bank',type:'income',status:'confirmed',source:e.src,sources:[e.src],raw:[e.raw],note:'單一收入',catChecked:true};
+  const n={id:uid(),ts:e.ts,amount:r2(e.amount),merchant:e.name,category:'其他',channel:'bank',type:'income',status:'confirmed',source:e.src,sources:[e.src],raw:[e.raw],note:/(支票|cheque|\bchq\b)/i.test(e.raw||'')?'單一收入；支票':'單一收入',catChecked:true};
   S.txns.push(n);if(res)res.income++;return n;
 }
 function ingest(t,rawLine,res){
-  t.raw=[rawLine];if(t.type!=='transfer'&&t.type!=='income'){if(l4Of(rawLine))t.l4Guess=true;applyL4(t,[rawLine])}
+  t.raw=[rawLine];
+  // 信用卡扣數而商戶係 PayMe／BoC Pay 等錢包：即係增值，唔當支出
+  if(t.type==='expense'&&isCreditCh(t.channel)&&/(payme|boc ?pay|alipay|wechat ?pay|增值|top.?up|reload|充值)/i.test(t.merchant||'')){t.type='transfer';const w=PAY_APP.find(p=>p[0].test(t.merchant||''));if(w)t.merchant=`${w[2]} 增值`;t.note=((t.note?t.note+'；':'')+`增值途徑：${chName(t.channel)}`)}
+  // 支票：當銀行轉賬，備註「支票」
+  if(/(支票|cheque|\bchq\b)/i.test(rawLine)){if(chRank(t.channel)===0||t.channel==='other')t.channel='bank';if(!/支票/.test(t.note||''))t.note=((t.note?t.note+'；':'')+'支票')}
+  if(t.type!=='transfer'&&t.type!=='income'){if(l4Of(rawLine))t.l4Guess=true;applyL4(t,[rawLine])}
   // 信用卡 HK$0.1 交易：通常係儲分／驗證，唔會真正扣數
   if(t.type==='expense'&&t.amount<=0.1+1e-9&&isCreditCh(t.channel)){t.type='void';t.status='confirmed';t.note=(t.note?t.note+'；':'')+'HK$0.1 信用卡交易，當儲分／驗證，唔計支出'}
   const both=S.channels.applepay&&S.channels.sms;
@@ -1073,7 +1087,8 @@ function stmtInfo(c){
   const s0=at(addMonths(ym,-1)),s1=at(ym),s2=at(addMonths(ym,1));
   const dueOf=y=>{if(rule!=='fixed')return nextWork(addDays(at(y),26));if(!+c.dueDay)return null;const nx=c.dueMonth==='same'?false:c.dueMonth==='next'?true:+c.dueDay<=sd;const dm=nx?addMonths(y,1):y;return`${dm}-${pad(Math.min(+c.dueDay,daysIn(dm)))}`};
   const tx=ALL.filter(t=>t.channel===c.id),d=t=>t.ts.slice(0,10);
-  const tot=(a,b)=>r2(sum(tx.filter(t=>isExp(t)&&d(t)>a&&d(t)<=b))-sum(tx.filter(t=>isRef(t)&&d(t)>a&&d(t)<=b)));
+  const owe=t=>isExp(t)||(t.type==='transfer'&&t.channel===c.id);
+  const tot=(a,b)=>r2(sum(tx.filter(t=>owe(t)&&d(t)>a&&d(t)<=b))-sum(tx.filter(t=>isRef(t)&&d(t)>a&&d(t)<=b)));
   const due=dueOf(ym),left=due?Math.round((toDate(due+'T00:00')-toDate(today+'T00:00'))/864e5):null;
   return{s0,s1,s2,due,left,amt:tot(s0,s1),cur:tot(s1,'9999'),nextDue:dueOf(addMonths(ym,1)),est:rule!=='fixed'};
 }
