@@ -247,7 +247,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.26-57';
+const APP_VERSION='2026.10.26-58';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -324,16 +324,46 @@ function openKwEdit(k){
 // 重新自動分類：只改冇手動改過分類嘅記錄；判斷唔到（其他）就唔郁
 // 分類係「其他」（預設）就一定可以重新判斷，包括一鍵核實咗嘅；只有你親手揀過嘅分類先唔郁
 const isCatManual=t=>t.catManual||isDesig(t.category)||(t.catChecked&&t.category!=='其他');
-// 渠道係「信用卡（未指定）／其他」呢類預設值：用內容重新認卡（卡尾號、卡名）
-function guessChannel(t){if(t.chEdited||chRank(t.channel)>0)return null;const raws=(t.raw||[]).join(' ¦ ');if(!raws)return null;
-  const c=l4Card(raws)||matchCard(raws);return c&&c.id!==t.channel?c.id:null}
+// 預設值（例如「通知付款」、「其他」、「信用卡（未指定）」）：用原文同埋同一筆嘅其他通知（包括合併咗去垃圾筒嗰則）補返資料
+function siblingsOf(t){const W=S.settings.mergeHours||12;const pool=[...S.txns,...S.trash.filter(x=>x.kind==='txn').map(x=>x.item)];
+  return pool.filter(o=>o&&o.id!==t.id&&o.type===t.type&&Math.abs(o.amount-t.amount)<0.005&&o.ts&&Math.abs(toDate(o.ts)-toDate(t.ts))/36e5<=W)}
+function improveTxn(t){
+  if(t.type!=='expense'&&t.type!=='refund')return null;
+  const out={};const raws=(t.raw||[]).filter(Boolean);const sib=siblingsOf(t);
+  // 渠道
+  if(!t.chEdited&&!t.byL4&&chRank(t.channel)===0){
+    let ch=null;const txt=raws.join(' ¦ ');const c=txt&&(l4Card(txt)||matchCard(txt));if(c)ch=c.id;
+    if(!ch){const o=sib.find(o=>chRank(o.channel)>0);if(o)ch=o.channel}
+    if(ch&&ch!==t.channel)out.ch=ch}
+  // 商戶
+  let mer=t.merchant;
+  if(!t.merEdited&&(!mer||GENERIC_MER.test(mer))){
+    let m=null;for(const r of raws){const body=String(r).replace(/^\s*(notif|ocr|sms|pay)\s*\|\|[^|]*\|\|\s*/i,'');if(/^\s*mail\s*\|\|/i.test(r))continue;try{const w=parseWalletNotif(body);if(w&&w.merchant&&!GENERIC_MER.test(w.merchant)){m=w.merchant;break}}catch(e){}}
+    if(!m){const o=sib.find(o=>o.merchant&&!GENERIC_MER.test(o.merchant));if(o)m=o.merchant}
+    if(m&&m!==mer){out.mer=m;mer=m}}
+  // 分類
+  if(!isCatManual(t)){const c=categorize(mer);if(c!=='其他'&&c!==t.category)out.c=c}
+  return out.ch||out.mer||out.c?out:null;
+}
+function applyImprove(t,x){const before={category:t.category,channel:t.channel,merchant:t.merchant};if(x.mer)t.merchant=x.mer;if(x.ch)t.channel=x.ch;if(x.c)t.category=x.c;return before}
+// 未核實嘅新記錄：顯示時自動補分類／渠道／商戶，等你核實
+function autoFixPending(){let n=0;for(const t of S.txns){if(t.status==='confirmed')continue;const x=improveTxn(t);if(x){applyImprove(t,x);n++}}if(n)localSave();return n}
 function recatRange(mode){const a=todayKey();if(mode==='all')return null;const r=range(mode,a);return[fmtLocal(r.s),fmtLocal(r.e)]}
-function recatPreview(mode){const R=recatRange(mode);return S.txns.filter(t=>(t.type==='expense'||t.type==='refund')&&(!R||(t.ts>=R[0]&&t.ts<R[1]))).map(t=>{const c=isCatManual(t)?null:categorize(t.merchant);return{t,c:c&&c!=='其他'&&c!==t.category?c:null,ch:guessChannel(t)}}).filter(x=>x.c||x.ch)}
+function recatPreview(mode){const R=recatRange(mode);return S.txns.filter(t=>(t.type==='expense'||t.type==='refund')&&(!R||(t.ts>=R[0]&&t.ts<R[1]))).map(t=>({t,x:improveTxn(t)})).filter(o=>o.x)}
+// 顯示今次改咗邊幾筆，可以一次過復原
+function showRecatLog(log){
+  openSheet(`已調整 ${log.length} 筆`,`<div class="small muted">撳任何一筆可以打開再改。</div>
+    <div class="list">${log.map(({t,x,b})=>`<button class="li" type="button" data-rlog="${esc(t.id)}" style="display:block;text-align:left"><span class="t" style="display:block">${esc(t.merchant)} · ${money(t.amount)} <span class="small faint">${t.ts.slice(8,10)}/${t.ts.slice(5,7)}/${t.ts.slice(0,4)}</span></span><span class="m" style="display:block">${[x.mer?`商戶：${esc(b.merchant||'（冇）')} → ${esc(t.merchant)}`:'',x.c?`分類：${esc(catLabel(b.category))} → ${esc(catLabel(t.category))}`:'',x.ch?`渠道：${esc(chName(b.channel))} → ${esc(chName(t.channel))}`:''].filter(Boolean).join('<br>')}</span></button>`).join('')}</div>
+    <div class="actions"><button class="btn" type="button" data-close>完成</button><button class="btn line" type="button" id="rlog-undo">全部復原</button></div>`,()=>{
+    document.querySelectorAll('[data-rlog]').forEach(b=>b.onclick=()=>{closeSheet();openEditTx(b.dataset.rlog)});
+    arm($('#rlog-undo'),()=>{log.forEach(({t,b})=>Object.assign(t,b));save();closeSheet();render();toast('已復原')},'再按一次確認復原');
+  });
+}
 function openRecat(){
   const M=[['week','本周'],['month','本月'],['quarter','本季'],['year','本年'],['all','全部']];
-  openSheet('重新自動分類',`<div class="small muted">用而家嘅分類關鍵字，重新判斷支出嘅分類：分類仲係「其他」嘅（包括一鍵核實咗嘅）同未手動改過嘅都會重新判斷；你親手揀過分類或者揀咗指定類別嘅唔會郁；判斷唔到嘅照舊。渠道仲係「信用卡（未指定）／其他」嘅，會用通知內容嘅卡尾號或卡名認返張卡。</div>
-    <div class="list">${M.map(([k,l])=>{const P=recatPreview(k),nc=P.filter(x=>x.c).length,nh=P.filter(x=>x.ch).length,n=P.length;return`<button class="li" type="button" data-rc-go="${k}" ${n?'':'disabled'}><span class="grow"><span class="t" style="display:block">${l}</span><span class="m">${n?[nc?`${nc} 筆改分類`:'',nh?`${nh} 筆認返張卡`:''].filter(Boolean).join('、'):'冇需要改'}</span></span><span class="faint">›</span></button>`}).join('')}</div>`,()=>{
-    document.querySelectorAll('[data-rc-go]').forEach(b=>b.onclick=()=>{const L=recatPreview(b.dataset.rcGo);L.forEach(x=>{if(x.c)x.t.category=x.c;if(x.ch)x.t.channel=x.ch});save();closeSheet();render();toast(`已更新 ${L.length} 筆`)});
+  openSheet('重新自動分類',`<div class="small muted">用而家嘅分類關鍵字同埋原文，重新判斷支出（商戶寫住「通知付款」等嘅會由原文或同一筆嘅其他通知補返）。分類：分類仲係「其他」嘅（包括一鍵核實咗嘅）同未手動改過嘅都會重新判斷；你親手揀過分類或者揀咗指定類別嘅唔會郁；判斷唔到嘅照舊。渠道仲係「信用卡（未指定）／其他」嘅，會用通知內容嘅卡尾號或卡名認返張卡。</div>
+    <div class="list">${M.map(([k,l])=>{const P=recatPreview(k),nc=P.filter(o=>o.x.c).length,nh=P.filter(o=>o.x.ch).length,nm=P.filter(o=>o.x.mer).length,n=P.length;return`<button class="li" type="button" data-rc-go="${k}" ${n?'':'disabled'}><span class="grow"><span class="t" style="display:block">${l}</span><span class="m">${n?[nc?`${nc} 筆改分類`:'',nh?`${nh} 筆認返張卡`:'',nm?`${nm} 筆補返商戶`:''].filter(Boolean).join('、'):'冇需要改'}</span></span><span class="faint">›</span></button>`}).join('')}</div>`,()=>{
+    document.querySelectorAll('[data-rc-go]').forEach(b=>b.onclick=()=>{const L=recatPreview(b.dataset.rcGo);const log=L.map(o=>({t:o.t,x:o.x,b:applyImprove(o.t,o.x)}));save();render();showRecatLog(log)});
   });
 }
 function categorize(text){
@@ -1807,7 +1837,7 @@ function openEditTx(id){
       $('#f-save').onclick=()=>{
         const amt=num($('#f-amt').value);if(!(amt>0))return errIn('f-err')('請輸入大過 0 嘅金額');
         const d=readDate('f-date');const noDay=d.length===7;
-        if($('#f-ch').value!==t.channel)t.chEdited=true;if($('#f-cat').value!==t.category)t.catManual=true;
+        if($('#f-ch').value!==t.channel)t.chEdited=true;if($('#f-cat').value!==t.category)t.catManual=true;if($('#f-mer').value.trim()!==(t.merchant||''))t.merEdited=true;
         Object.assign(t,{ts:noDay?`${d}-01T00:00`:`${d}T${$('#f-time').value||'12:00'}`,noDay,amount:r2(amt),merchant:$('#f-mer').value.trim(),category:$('#f-cat').value,channel:$('#f-ch').value,type:$('#f-type').value,status:$('#f-st').value,note:$('#f-note').value.trim(),catChecked:true});
         delete t.suggestTpl;delete t.suggestBill;
         if(t.type==='income'&&$('#f-tpl').value){const T=S.incomeTemplates.find(x=>x.id===$('#f-tpl').value);const M=payMonth(t.ts);t.linkTpl=T.id;t.linkMonth=M;
@@ -2203,7 +2233,7 @@ function setTab(t){ui.tab=t;try{localStorage.setItem('ledger.tab',t)}catch(e){}r
 
 function updateBadge(){const n=S.txns.filter(t=>t.status==='pending').length;const bd=$('#badge');bd.hidden=!n;bd.textContent=n}
 function render(){
-  rebuild();
+  autoFixPending();rebuild();
   ['overview','records','cards','analysis'].forEach(k=>{$('#tab-'+k).hidden=k!==ui.tab;document.querySelector(`.tabbar [data-tab="${k}"]`)[k===ui.tab?'setAttribute':'removeAttribute']('aria-current','page')});
   ({overview:renderOverview,records:renderRecords,cards:renderCards,analysis:renderAnalysis})[ui.tab]();
   updateBadge();
