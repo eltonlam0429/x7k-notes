@@ -247,7 +247,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.26-56';
+const APP_VERSION='2026.10.26-57';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -322,14 +322,18 @@ function openKwEdit(k){
     $('#ckw-save').onclick=()=>{const L=[...new Set($('#ckw-text').value.split(/[,，、\n]/).map(x=>x.trim()).filter(Boolean))];S.settings.catKw=S.settings.catKw||{};if(L.length)S.settings.catKw[k]=L.join(', ');else delete S.settings.catKw[k];save();closeSheet();render();toast(`已儲存 ${L.length} 個字眼，可以撳「重新自動分類」套用落舊記錄`)}});
 }
 // 重新自動分類：只改冇手動改過分類嘅記錄；判斷唔到（其他）就唔郁
-const isCatManual=t=>t.catManual||t.catChecked||isDesig(t.category);
+// 分類係「其他」（預設）就一定可以重新判斷，包括一鍵核實咗嘅；只有你親手揀過嘅分類先唔郁
+const isCatManual=t=>t.catManual||isDesig(t.category)||(t.catChecked&&t.category!=='其他');
+// 渠道係「信用卡（未指定）／其他」呢類預設值：用內容重新認卡（卡尾號、卡名）
+function guessChannel(t){if(t.chEdited||chRank(t.channel)>0)return null;const raws=(t.raw||[]).join(' ¦ ');if(!raws)return null;
+  const c=l4Card(raws)||matchCard(raws);return c&&c.id!==t.channel?c.id:null}
 function recatRange(mode){const a=todayKey();if(mode==='all')return null;const r=range(mode,a);return[fmtLocal(r.s),fmtLocal(r.e)]}
-function recatPreview(mode){const R=recatRange(mode);return S.txns.filter(t=>(t.type==='expense'||t.type==='refund')&&!isCatManual(t)&&(!R||(t.ts>=R[0]&&t.ts<R[1]))).map(t=>({t,c:categorize(t.merchant)})).filter(x=>x.c!=='其他'&&x.c!==x.t.category)}
+function recatPreview(mode){const R=recatRange(mode);return S.txns.filter(t=>(t.type==='expense'||t.type==='refund')&&(!R||(t.ts>=R[0]&&t.ts<R[1]))).map(t=>{const c=isCatManual(t)?null:categorize(t.merchant);return{t,c:c&&c!=='其他'&&c!==t.category?c:null,ch:guessChannel(t)}}).filter(x=>x.c||x.ch)}
 function openRecat(){
   const M=[['week','本周'],['month','本月'],['quarter','本季'],['year','本年'],['all','全部']];
-  openSheet('重新自動分類',`<div class="small muted">用而家嘅分類關鍵字，重新判斷<b>冇手動改過分類</b>嘅支出。你手動改過、核對過或者揀咗指定類別嘅記錄唔會郁；判斷唔到嘅照舊。</div>
-    <div class="list">${M.map(([k,l])=>{const n=recatPreview(k).length;return`<button class="li" type="button" data-rc-go="${k}" ${n?'':'disabled'}><span class="grow"><span class="t" style="display:block">${l}</span><span class="m">${n?`${n} 筆會改分類`:'冇需要改'}</span></span><span class="faint">›</span></button>`}).join('')}</div>`,()=>{
-    document.querySelectorAll('[data-rc-go]').forEach(b=>b.onclick=()=>{const L=recatPreview(b.dataset.rcGo);L.forEach(x=>x.t.category=x.c);save();closeSheet();render();toast(`已重新分類 ${L.length} 筆`)});
+  openSheet('重新自動分類',`<div class="small muted">用而家嘅分類關鍵字，重新判斷支出嘅分類：分類仲係「其他」嘅（包括一鍵核實咗嘅）同未手動改過嘅都會重新判斷；你親手揀過分類或者揀咗指定類別嘅唔會郁；判斷唔到嘅照舊。渠道仲係「信用卡（未指定）／其他」嘅，會用通知內容嘅卡尾號或卡名認返張卡。</div>
+    <div class="list">${M.map(([k,l])=>{const P=recatPreview(k),nc=P.filter(x=>x.c).length,nh=P.filter(x=>x.ch).length,n=P.length;return`<button class="li" type="button" data-rc-go="${k}" ${n?'':'disabled'}><span class="grow"><span class="t" style="display:block">${l}</span><span class="m">${n?[nc?`${nc} 筆改分類`:'',nh?`${nh} 筆認返張卡`:''].filter(Boolean).join('、'):'冇需要改'}</span></span><span class="faint">›</span></button>`}).join('')}</div>`,()=>{
+    document.querySelectorAll('[data-rc-go]').forEach(b=>b.onclick=()=>{const L=recatPreview(b.dataset.rcGo);L.forEach(x=>{if(x.c)x.t.category=x.c;if(x.ch)x.t.channel=x.ch});save();closeSheet();render();toast(`已更新 ${L.length} 筆`)});
   });
 }
 function categorize(text){
