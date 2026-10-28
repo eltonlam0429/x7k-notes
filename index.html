@@ -3,11 +3,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; form-action 'none'; frame-src 'self'; base-uri 'none'">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="記帳簿"><meta name="theme-color" content="#FFFFFF"><link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAADMUlEQVR4nO3dMW4UVxzA4XXEDVKCaGmgSEXKtLlAesQF0lFGuUCUA0RJnwvQUsZVCtO4RYSShgukmMhaIf82Nob33q6+r9rK8zT++f9mx+P12Yf373Zwna9mL4B1iYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDpI4SOIgiYMkDtK92Qv4z/c//z17CWt5+dM3s5ewO5v+h9SyOGBuIjPjkMUNzUpk2jWHMm5u1rmaE4cybmvKGZsQhzI+zfjz5q0saXQcxsZdDD57JgdpaBzGxt2NPIcmB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB2noxz799vzr7cWjJ09HHvc0XF6cDz6iyUESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQxEESB0kcJHGQVvkfb4e9+uv17CVc77tvH89ewhe0ehzLZrHZlneqidhWSEvHsfjYuHIs67ytpeNgLnGQlo7jWC70jmWdt7V0HMy1+lvZ7Ydy2Su+U50Zm9Xj2Jz292BZthWSOEjiIImDJA6SOEjiIImDdBw3wQbfIXXPbbN6HFNunJ/28103Z1shLR3H3N+3LfvbvmGWjoO5xEFaOo65l4QuSJeOg7lWfys75UkwM2Ozehwb360pbCskcZCOY1sZ7IdnP85ewv/7/ZcXX/oQJgdJHCTbyiF//vHr3b/I1Sb1eb/aACYHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZA8z3HI53144iiePtxncpDEQbKtHOIxQbieOEjiIImDJA6SOEjiIImDJA6SOEjiIA2N4/6Dh9uLy4vzkcfl05gcpNFxGB5HZObk0Mfizj68fzf+qP+8fXP1+tGTp+MXcNhRPM93sp8meLW57Ha7y4tzI2RN054Eu//g4f780MeC5mwr+/YT4SP7I3a8+XFsJPKRuVlsVomDBbkJRhIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIH6V8cAYcaHfYc/wAAAABJRU5ErkJggg==">
+<meta name="apple-mobile-web-app-title" content="錢跡"><meta name="theme-color" content="#FFFFFF"><link rel="apple-touch-icon" href="data:image/png;base64,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">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
-<title>我的記帳簿</title>
+<title>錢跡</title>
 <style>
-/* Layout: phone-first single column (max 560px), white rounded cards on a cool grey-blue ground, navy hero, fixed bottom tab bar */
+/* Layout: phone-first single column (max 560px), white rounded cards on a soft mint ground, deep-teal hero, fixed bottom tab bar */
 :root{
   --bg:#EDF0F5; --surface:#FFFFFF; --surface-2:#F3F5F9; --ink:#17223A; --ink-2:#56607A; --ink-3:#8C95A8; --line:#E2E6EE;
   --accent:#2F4F82; --accent-ink:#FFFFFF; --accent-soft:#E3E9F3; --bar:#BCCBE0; --bar-sel:#2C4A7C;
@@ -214,12 +214,32 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 #toast button{background:none;border:0;color:var(--bar);font-weight:700;padding:0;white-space:nowrap;flex:none}
 .empty{padding:22px 8px;text-align:center;color:var(--ink-3);font-size:14px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* 設計風格：扁平卡片、圓角膠囊按鈕、浮動底部分頁 */
+.card{border-radius:14px;border:1px solid var(--line);box-shadow:none}
+.hero{background:var(--hero-a);border-radius:16px}
+.hero::after{background:radial-gradient(circle at 92% 8%,rgba(255,255,255,.16) 0 70px,transparent 71px),radial-gradient(circle at 78% 120%,rgba(255,255,255,.10) 0 90px,transparent 91px)}
+.hero .big{font-weight:800}
+h1{font-size:26px;font-weight:700;letter-spacing:0}
+.eyebrow{text-transform:none;letter-spacing:.02em;color:var(--accent);font-weight:600}
+.btn{border-radius:999px}
+.pill{border-radius:999px}
+.chip{border-radius:999px}
+.seg{border-radius:999px}
+.seg button{border-radius:999px}
+.topbar{border-bottom:0;background:color-mix(in srgb,var(--bg) 88%,transparent)}
+.brand{color:var(--ink);letter-spacing:.04em}
+.stat .ic{border-radius:10px}
+.tabbar{left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));border:1px solid var(--line);border-radius:22px;padding:6px;box-shadow:0 8px 28px rgba(23,34,58,.14)}
+.tabbar button{border-radius:16px;font-size:12px}
+.tabbar button[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
+main{padding-bottom:calc(120px + env(safe-area-inset-bottom,0px))}
 </style>
 
 </head><body>
 <header class="topbar"><div class="topbar-in">
-  <svg class="app-icon" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#F3EEE6"/><rect x="8" y="7" width="24" height="27" rx="3" fill="#fff" stroke="#D8D2C8"/><rect x="8" y="7" width="24" height="7" rx="3" fill="#3C6FB5"/><g fill="#BFC7D3"><rect x="11" y="18" width="12" height="2" rx="1"/><rect x="11" y="22" width="9" height="2" rx="1"/></g><rect x="20" y="24" width="12" height="9" rx="1.5" fill="#fff" stroke="#55606F"/><g stroke="#55606F" stroke-width="1"><path d="M20 28.5h12M26 24v9"/></g></svg>
-  <div class="brand">我的記帳簿</div>
+  <svg class="app-icon" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="aig" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5A7FB8"/><stop offset="1" stop-color="#22385E"/></linearGradient></defs><rect width="40" height="40" rx="10" fill="url(#aig)"/><rect x="9" y="8" width="18" height="24" rx="3" fill="#fff"/><g fill="#BFCFE6"><rect x="12" y="13" width="11" height="2" rx="1"/><rect x="12" y="17.5" width="8" height="2" rx="1"/><rect x="12" y="22" width="10" height="2" rx="1"/></g><circle cx="27.5" cy="27" r="7" fill="#F6B840" stroke="#fff" stroke-width="1.6"/><path d="M27.5 23.2v7.6M29.3 24.8c-.5-.6-1.2-.8-1.9-.8-1 0-1.9.5-1.9 1.4 0 1.9 3.9 1.1 3.9 3 0 .9-.9 1.5-2 1.5-.8 0-1.6-.3-2.1-.9" stroke="#7A4A00" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg>
+  <div class="brand">錢跡</div>
   <button class="pill" id="btn-hide" type="button"></button>
   <button class="pill outline" id="btn-import" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/></svg>更新</button>
 </div></header>
@@ -232,10 +252,10 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 </main>
 
 <nav class="tabbar" aria-label="分頁"><div class="tabbar-in">
-  <button data-tab="overview" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 9-9 9-9-9z"/><path d="M12 8l4 4-4 4-4-4z" fill="currentColor"/></svg>總覽</button>
-  <button data-tab="records" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h3M10 7h10M4 12h3M10 12h10M4 17h3M10 17h10"/></svg>記錄與核實<span class="count" id="badge" hidden></span></button>
-  <button data-tab="cards" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1.5"/><rect x="7.5" y="7.5" width="9" height="9" fill="currentColor"/></svg>卡與渠道</button>
-  <button data-tab="analysis" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M7 7v10M10 7v10M13 7v10M16 7v10"/></svg>分類分析</button>
+  <button data-tab="overview" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></svg>首頁</button>
+  <button data-tab="records" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>明細<span class="count" id="badge" hidden></span></button>
+  <button data-tab="cards" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18"/><path d="M16 15h2"/></svg>錢包</button>
+  <button data-tab="analysis" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg>報表</button>
 </div></nav>
 
 <div id="sheet" hidden></div>
@@ -247,7 +267,7 @@ details summary{cursor:pointer;font-weight:600;list-style-position:outside}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.26-58';
+const APP_VERSION='2026.10.28-60';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -328,6 +348,7 @@ const isCatManual=t=>t.catManual||isDesig(t.category)||(t.catChecked&&t.category
 function siblingsOf(t){const W=S.settings.mergeHours||12;const pool=[...S.txns,...S.trash.filter(x=>x.kind==='txn').map(x=>x.item)];
   return pool.filter(o=>o&&o.id!==t.id&&o.type===t.type&&Math.abs(o.amount-t.amount)<0.005&&o.ts&&Math.abs(toDate(o.ts)-toDate(t.ts))/36e5<=W)}
 function improveTxn(t){
+  if(t.type==='transfer'){const cp={...t};return applyPaymeFund(cp)?{ch:cp.channel,mer:cp.merchant!==t.merchant?cp.merchant:undefined}:null}
   if(t.type!=='expense'&&t.type!=='refund')return null;
   const out={};const raws=(t.raw||[]).filter(Boolean);const sib=siblingsOf(t);
   // 渠道
@@ -349,7 +370,7 @@ function applyImprove(t,x){const before={category:t.category,channel:t.channel,m
 // 未核實嘅新記錄：顯示時自動補分類／渠道／商戶，等你核實
 function autoFixPending(){let n=0;for(const t of S.txns){if(t.status==='confirmed')continue;const x=improveTxn(t);if(x){applyImprove(t,x);n++}}if(n)localSave();return n}
 function recatRange(mode){const a=todayKey();if(mode==='all')return null;const r=range(mode,a);return[fmtLocal(r.s),fmtLocal(r.e)]}
-function recatPreview(mode){const R=recatRange(mode);return S.txns.filter(t=>(t.type==='expense'||t.type==='refund')&&(!R||(t.ts>=R[0]&&t.ts<R[1]))).map(t=>({t,x:improveTxn(t)})).filter(o=>o.x)}
+function recatPreview(mode){const R=recatRange(mode);return S.txns.filter(t=>(t.type==='expense'||t.type==='refund'||t.type==='transfer')&&(!R||(t.ts>=R[0]&&t.ts<R[1]))).map(t=>({t,x:improveTxn(t)})).filter(o=>o.x)}
 // 顯示今次改咗邊幾筆，可以一次過復原
 function showRecatLog(log){
   openSheet(`已調整 ${log.length} 筆`,`<div class="small muted">撳任何一筆可以打開再改。</div>
@@ -442,6 +463,8 @@ function migrateSched(x,isBill){
   else if(!x.startDate)x.startDate=(x.startMonth||curMonth())+'-01';
 }
 function migrate(s){
+  // 2026.10.28：用信用卡經 Alipay／WeChat Pay 俾錢係消費，唔係增值，改返做支出
+  (s.txns||[]).forEach(t=>{if(t.type==='transfer'&&/^(AlipayHK|WeChat Pay) 增值$/.test(t.merchant||'')&&!(t.raw||[]).some(r=>/(增值|top.?up|充值|reload)/i.test(r))){t.type='expense';t.merchant=t.merchant.replace(/ 增值$/,'');t.note=String(t.note||'').replace(/；?增值途徑：[^；]*/,'').replace(/^；/,'');if(t.status==='confirmed'&&t.category==='其他')t.status='pending'}});
   // 2026.10.25：分類改名、指定改做每張卡自訂
   {const R=k=>CAT_RENAME[k]||k;
    (s.txns||[]).forEach(t=>{if(t.category)t.category=R(t.category)});(s.bills||[]).forEach(b=>{if(b.category)b.category=R(b.category)});
@@ -537,14 +560,14 @@ function incomeItems(m){
     const act=S.txns.find(x=>x.linkTpl===t.id&&x.linkMonth===m);
     out.push({id:t.id,src:'tpl',name:t.name,kind:t.kind,amount:r2(per*occ.length),per,n:occ.length,adjusted:ov!=null,tpl:t,actual:act||null});
   }
-  // 總覽嘅收入只計定期收入，同你喺收入卡手動加嘅項目（例如 Bonus）；
-  // 別人轉帳俾你嘅錢（記錄與核實入面嘅「單一收入」）唔計喺度
+  // 首頁嘅收入只計定期收入，同你喺收入卡手動加嘅項目（例如 Bonus）；
+  // 別人轉帳俾你嘅錢（明細入面嘅「單一收入」）唔計喺度
   for(const e of S.incomeEntries)if(e.month===m&&!e.auto)out.push({id:e.id,src:'entry',name:e.name,kind:e.kind,amount:e.amount,day:e.day||null,auto:!!e.auto});
   return out;
 }
-// 單一收入：記錄與核實入面、已確認、冇對應定期收入嘅收入（例如朋友轉帳）
+// 單一收入：明細入面、已確認、冇對應定期收入嘅收入（例如朋友轉帳）
 function onceIncome(m){return S.txns.filter(x=>x.type==='income'&&!x.linkTpl&&x.status==='confirmed'&&x.ts.startsWith(m))}
-// 舊版放咗喺收入卡嘅自動收入（轉數／PayMe 等），搬去記錄與核實做單一收入
+// 舊版放咗喺收入卡嘅自動收入（轉數／PayMe 等），搬去明細做單一收入
 function moveAutoIncome(){
   let n=0;S.incomeEntries=S.incomeEntries.filter(e=>{if(!e.auto)return true;
     S.txns.push({id:e.id,ts:e.ts||`${e.month}-${String(e.day||1).padStart(2,'0')}T12:00`,amount:e.amount,merchant:e.name,category:'其他',channel:'bank',type:'income',status:'confirmed',source:e.src||'sms',sources:[e.src||'sms'],raw:e.raw||[],note:'單一收入',catChecked:true});n++;return false});
@@ -588,7 +611,7 @@ function parseTime(s){
 function matchCard(str){
   if(!str)return null;const s=String(str).toLowerCase();
   let best=null,bl=0;
-  for(const c of S.cards){for(const k of [c.name,...(c.keywords||[])]){if(!k)continue;const kk=k.toLowerCase();if(s.includes(kk)&&kk.length>bl){best=c;bl=kk.length}}}
+  for(const c of S.cards){if(c.type==='payme')continue;for(const k of [c.name,...(c.keywords||[])]){if(!k)continue;const kk=k.toLowerCase();if(s.includes(kk)&&kk.length>bl){best=c;bl=kk.length}}}
   return best;
 }
 function parseSMS(text){
@@ -851,9 +874,10 @@ function addIncomeAuto(e,res){
 function ingest(t,rawLine,res){
   t.raw=[rawLine];
   // 信用卡扣數而商戶係 PayMe／BoC Pay 等錢包：即係增值，唔當支出
-  if(t.type==='expense'&&isCreditCh(t.channel)&&/(payme|boc ?pay|alipay|wechat ?pay|增值|top.?up|reload|充值)/i.test(t.merchant||'')){t.type='transfer';const w=PAY_APP.find(p=>p[0].test(t.merchant||''));if(w)t.merchant=`${w[2]} 增值`;t.note=((t.note?t.note+'；':'')+`增值途徑：${chName(t.channel)}`)}
+  if(t.type==='expense'&&isCreditCh(t.channel)&&(/(payme|boc ?pay|增值|top.?up|reload|充值)/i.test(t.merchant||'')||/(增值|top.?up|充值)/i.test(rawLine))){t.type='transfer';const w=PAY_APP.find(p=>p[0].test(t.merchant||''));if(w)t.merchant=`${w[2]} 增值`;t.note=((t.note?t.note+'；':'')+`增值途徑：${chName(t.channel)}`)}
   // 支票：當銀行轉賬，備註「支票」
   if(/(支票|cheque|\bchq\b)/i.test(rawLine)){if(chRank(t.channel)===0||t.channel==='other')t.channel='bank';if(!/支票/.test(t.note||''))t.note=((t.note?t.note+'；':'')+'支票')}
+  applyPaymeFund(t);
   if(t.type!=='transfer'&&t.type!=='income'){if(l4Of(rawLine))t.l4Guess=true;applyL4(t,[rawLine])}
   // 信用卡 HK$0.1 交易：通常係儲分／驗證，唔會真正扣數
   if(t.type==='expense'&&t.amount<=0.1+1e-9&&isCreditCh(t.channel)){t.type='void';t.status='confirmed';t.note=(t.note?t.note+'；':'')+'HK$0.1 信用卡交易，當儲分／驗證，唔計支出'}
@@ -1425,7 +1449,7 @@ function txRow(t){
   return `<button class="li" type="button" data-act="edit" data-id="${esc(t.id)}"><span class="dot ${t.status}" aria-label="${ST_L[t.status]}"></span><span class="grow"><span class="t" style="display:block">${esc(t.merchant||'（冇描述）')}</span><span class="m">${t.noDay?'未指定日子':`${pad(d.getHours())}:${pad(d.getMinutes())}`} · ${catChip(t.category)} · ${esc(chName(t.channel))}${merged?' · 已合併':''}${t.source==='fixed'?' · 定期繳費':''}${t.linkTpl?` · 對應「${esc((S.incomeTemplates.find(x=>x.id===t.linkTpl)||{}).name||'收入')}」${+t.linkMonth.slice(5)}月`:''}${t.linkBill?` · 對應定期支出「${esc((S.bills.find(x=>x.id===t.linkBill.bid)||{}).name||'')}」`:''}</span></span><span class="amt num ${t.type}">${t.type==='refund'||t.type==='income'?'+':''}${money(t.amount)}</span></button>`;
 }
 
-/* ===================== 總覽 ===================== */
+/* ===================== 首頁 ===================== */
 function monthsAvailable(){
   const set=new Set([curMonth()]);ALL.forEach(t=>set.add(t.ts.slice(0,7)));S.incomeEntries.forEach(e=>set.add(e.month));
   return[...set].sort().reverse();
@@ -1466,7 +1490,7 @@ function renderOverview(){
   $('#tab-overview').innerHTML=`
   ${S.demo?`<div class="demo"><span>而家顯示緊<b>示範資料</b>（跟截圖一樣）。清除之後就可以開始記你自己嘅數。</span><button class="btn sm" type="button" data-act="clear-demo">清除示範資料</button></div>`:''}
   <div class="page-head">
-    <div><div class="eyebrow">把每一筆，記清楚。</div><h1>我的收支總覽</h1></div>
+    <div><div class="eyebrow">今個月嘅錢，一目了然</div><h1>收支概況</h1></div>
     <label class="month-pick"><span class="small muted">查看月份</span><select id="ov-month" aria-label="查看月份">${monthsAvailable().map(x=>{const[a,b]=x.split('-').map(Number);return`<option value="${x}" ${x===m?'selected':''}>${MONTHS_EN[b-1]} ${a}</option>`}).join('')}</select></label>
   </div>
   <div class="status-row" id="status-row">${statusHtml()}</div>
@@ -1509,7 +1533,7 @@ function renderOverview(){
 
   <div class="card">
     <div class="card-head"><h3>定期收入</h3><button class="btn sm ghost" type="button" data-act="add-income">＋ 新增收入</button></div>
-    <div class="small muted">例如底薪、Bonus。別人轉帳俾你嘅錢（PayMe、轉數快、現金收入）係「額外收入」，喺記錄與核實出現，唔列喺呢度，但會計入上面「本月收入 · 額外收入」同結餘。</div>
+    <div class="small muted">例如底薪、Bonus。別人轉帳俾你嘅錢（PayMe、轉數快、現金收入）係「額外收入」，喺明細出現，唔列喺呢度，但會計入上面「本月收入 · 額外收入」同結餘。</div>
     <div class="datef two"><select id="inc-y" aria-label="收入年份">${yrs.map(k=>`<option value="${k}" ${k===imY?'selected':''}>${k} 年</option>`).join('')}</select><select id="inc-m" aria-label="收入月份">${Array.from({length:12},(_,i)=>`<option value="${i+1}" ${i+1===imM?'selected':''}>${i+1} 月</option>`).join('')}</select></div>
     <div class="sum-line"><span class="muted small">${imY}年${imM}月定期收入合計</span><b class="num">${masked(sum(imItems))}</b></div>
     <div class="list">${imItems.length?imItems.map(i=>`<button class="li" type="button" data-act="${i.src==='txn'?'edit':'edit-income'}" data-id="${esc(i.id)}" data-src="${i.src}"><span class="badge">${KIND[i.kind]||'其他'}</span><span class="grow"><span class="t" style="display:block">${esc(i.name)}</span><span class="m">${i.src==='tpl'?`${cycleText(i.tpl)}${i.n>1?` × ${i.n} 次`:''} · ${endText(i.tpl)}${i.adjusted?' · 本月已調整':''}${i.actual?' · ✓ 已收到實際入數':''}`:`手動加${i.day?` · ${i.day} 日`:''}`}</span></span><span class="amt num">${masked(i.amount)}</span></button>`).join(''):'<div class="empty">呢個月未有定期收入。可以設定每月底薪，或者逐月加 Bonus。</div>'}</div>
@@ -1533,7 +1557,7 @@ function renderOverview(){
 function quickAdd(text){
   let type=ui.qType||'expense';
   if(/^\s*(收入|收到|人哋俾返|俾返我|畀返我|還返我)/.test(text))type='income';
-  if(type==='expense'&&!S.channels.cash){toast('現金快速記帳已喺「卡與渠道」關閉');return}
+  if(type==='expense'&&!S.channels.cash){toast('現金快速記帳已喺「錢包」關閉');return}
   const p=parseQuick(String(text).replace(/^\s*(收入|收到)\s*/,''));
   if(!p)return;
   if(p.error){toast(p.error+(type==='income'?'，例如：朋友俾返 晚飯 150':'，例如：現金 午餐 45'));return}
@@ -1542,7 +1566,7 @@ function quickAdd(text){
     const name=p.merchant===p.category?'收入':p.merchant;
     const e={id:uid(),ts:p.ts,amount:p.amount,merchant:name||'收入',category:'其他',channel:'cash',type:'income',status:'confirmed',source:'quick',sources:['quick'],raw:[text],note:'單一收入',catChecked:true};
     S.txns.push(e);ui.qType='expense';save();render();
-    toast(`已記低單一收入：${e.merchant} ${money(e.amount)}（${+e.ts.slice(5,7)}月${+e.ts.slice(8,10)}日，喺記錄與核實睇）`,'復原',()=>{S.txns=S.txns.filter(x=>x!==e);save();render()});
+    toast(`已記低單一收入：${e.merchant} ${money(e.amount)}（${+e.ts.slice(5,7)}月${+e.ts.slice(8,10)}日，喺明細睇）`,'復原',()=>{S.txns=S.txns.filter(x=>x!==e);save();render()});
     return;
   }
   const t={id:uid(),ts:p.ts,amount:p.amount,merchant:p.merchant,category:p.category,channel:p.channel,type:'expense',status:p.confident?'confirmed':'pending',source:'cash',sources:['cash'],raw:[text],note:''};
@@ -1550,7 +1574,7 @@ function quickAdd(text){
   toast(`已記低：${t.merchant} ${money(t.amount)}（${t.category} · ${chName(t.channel)}）${p.confident?'':' · 待確認'}`,'復原',()=>{S.txns=S.txns.filter(x=>x.id!==t.id);save();render()});
 }
 
-/* ===================== 記錄與核實 ===================== */
+/* ===================== 明細 ===================== */
 function renderRecords(){
   const{mode,anchor}=ui.rec;const{s,e,label}=range(mode,anchor);
   // 下面只列已核實記錄；未核實嘅只喺「待核實」出現，核實後先會移落嚟
@@ -1576,7 +1600,7 @@ function renderRecords(){
     body=Object.keys(byD).map(k=>{if(k.endsWith('-00'))return`<div class="group-h"><span>${+k.slice(5,7)}月（未指定日子）</span><span class="num">${money(sum(byD[k].filter(isExp)))}</span></div>`+byD[k].map(txRow).join('');const d=toDate(k+'T00:00');return`<button class="group-h" type="button" data-act="drill-day" data-anchor="${k}"><span>${d.getMonth()+1}月${d.getDate()}日（${WK[d.getDay()]}）</span><span class="num">${money(sum(byD[k].filter(isExp)))}</span></button>`+byD[k].map(txRow).join('')}).join('');
   }
   $('#tab-records').innerHTML=`
-  <div class="page-head"><div><div class="eyebrow">逐筆睇清楚，錯咗即刻改。</div><h1>記錄與核實</h1></div><div class="actions" style="flex:none"><button class="btn sm line" type="button" data-act="trash">垃圾筒${S.trash.length?`（${S.trash.length}）`:''}</button><button class="btn sm" type="button" data-act="new-tx">＋ 新增支出</button></div></div>
+  <div class="page-head"><div><div class="eyebrow">每一筆都喺度</div><h1>交易明細</h1></div><div class="actions" style="flex:none"><button class="btn sm line" type="button" data-act="trash">垃圾筒${S.trash.length?`（${S.trash.length}）`:''}</button><button class="btn sm" type="button" data-act="new-tx">＋ 新增支出</button></div></div>
   ${open.length||pend.length||sugg.length||mchk.length?`<div class="card pending-zone"><div class="card-head"><h3>待核實</h3><span class="small muted">${open.length} 組可能重複 · ${pend.length+mchk.length} 筆待確認</span></div>
     <div class="small muted">呢度嘅記錄未計入下面嘅已核實記錄。撳入去可以改或刪除，確認之後就會移落去。</div>
     ${sugg.map(t=>{const T=t.suggestTpl&&S.incomeTemplates.find(x=>x.id===t.suggestTpl);const B=t.suggestBill&&S.bills.find(x=>x.id===t.suggestBill.bid);
@@ -1607,13 +1631,17 @@ function resolveReview(id,same){
   r.resolved=true;save();render();toast(same?'已合併為一筆':'已保留兩筆');
 }
 
-/* ===================== 卡與渠道 ===================== */
-const TYPE_CARD={credit:'信用卡',debit:'扣賬卡',octopus:'八達通',ewallet:'電子錢包'};
+/* ===================== 錢包 ===================== */
+const TYPE_CARD={credit:'信用卡',debit:'扣賬卡',octopus:'八達通',payme:'PayMe',ewallet:'電子錢包'};
+// PayMe 增值：設定咗「增值用嘅卡」，增值就當係嗰張卡嘅扣賬（計入卡數，唔計支出、唔計回贈）
+function paymeFund(){const p=S.cards.find(c=>c.type==='payme'&&c.fundCard&&S.cards.some(x=>x.id===c.fundCard));return p?p.fundCard:null}
+function applyPaymeFund(t){if(t.type!=='transfer'||t.chEdited)return false;const txt=[t.merchant,...(t.raw||[])].join(' ');if(!/payme/i.test(txt)||!/(增值|top.?up|充值|reload|add money)/i.test(txt))return false;
+  if(S.cards.some(c=>c.id===t.channel&&c.type==='credit'))return false;const f=paymeFund();if(!f)return false;t.channel=f;t.merchant='PayMe 增值';if(!/增值途徑/.test(t.note||''))t.note=((t.note?t.note+'；':'')+`增值途徑：${chName(f)}`);return true}
 function renderCards(){
   const m=curMonth();
-  const ch=[['applepay','Apple Pay（Wallet 交易）','每次拍卡由捷徑記低卡名、商戶、金額'],['sms','銀行短訊','捷徑轉交短訊，app 喺本機解析'],['octopus','八達通','Wallet 入面嘅八達通交易'],['notif','App 通知（iOS 27：銀包、八達通、PayMe 等）','iPhone 收到付款通知時由捷徑轉交，只保留有金額嘅內容'],['mail','電郵通知（PayMe／BoC Pay／轉數快／銀行交易通知）','Gmail 每 5 分鐘自動檢查，撳右上角「更新」即時檢查；只讀'],['cash','現金快速記帳','總覽頁嘅一句話記帳']];
+  const ch=[['applepay','Apple Pay（Wallet 交易）','每次拍卡由捷徑記低卡名、商戶、金額'],['sms','銀行短訊','捷徑轉交短訊，app 喺本機解析'],['octopus','八達通','Wallet 入面嘅八達通交易'],['notif','App 通知（iOS 27：銀包、八達通、PayMe 等）','iPhone 收到付款通知時由捷徑轉交，只保留有金額嘅內容'],['mail','電郵通知（PayMe／BoC Pay／轉數快／銀行交易通知）','Gmail 每 5 分鐘自動檢查，撳右上角「更新」即時檢查；只讀'],['cash','現金快速記帳','首頁嘅一句話記帳']];
   $('#tab-cards').innerHTML=`
-  <div class="page-head"><div><div class="eyebrow">收邊啲、點計回贈，由你揀。</div><h1>卡與渠道</h1></div></div>
+  <div class="page-head"><div><div class="eyebrow">卡、回贈同自動收集</div><h1>錢包與設定</h1></div></div>
   <div class="card" id="gs-card"><div class="card-head"><h3>Google 試算表</h3>${CONN?`<span class="badge">${net.state==='err'?'連線失敗':'已連接'}</span>`:''}</div>
     ${CONN?`<div class="small muted">${statusHtml().replace(/<[^>]+>/g,' ')}</div>
       ${SYNC.sheetUrl?`<a class="btn ghost" style="text-align:center;text-decoration:none" href="${esc(SYNC.sheetUrl)}" target="_blank" rel="noopener">打開試算表</a>`:''}
@@ -1642,14 +1670,14 @@ function renderCards(){
     <label class="field"><span>Apple Pay 同短訊合併時間範圍</span><select id="merge-h">${[2,6,12,24,48].map(h=>`<option value="${h}" ${S.settings.mergeHours===h?'selected':''}>${h} 小時內同金額就當係同一筆候選</option>`).join('')}</select></label>
   </div>
   <div class="card"><div class="card-head"><h3>我的卡（本期回贈）</h3><button class="btn sm ghost" type="button" data-act="add-card">＋ 新增卡</button></div>
-    <div class="list">${S.cards.length?S.cards.map(c=>{const cy=rebateCycle(c),r=calcRebate(c,cardSpend(c,cy),rebateAt(c,cy.s));return`<button class="li" type="button" data-act="edit-card" data-id="${esc(c.id)}" style="flex-wrap:wrap"><span class="grow"><span class="t" style="display:block">${esc(c.name)} <span class="badge">${TYPE_CARD[c.type]||c.type}</span>${c.collect===false?' <span class="badge">唔收集</span>':''}${c.auto?' <span class="badge">自動發現</span>':''}${sameL4(c).length?` <span class="badge">${c.l4Pref?'同尾號 · 優先':'同尾號'}</span>`:''}</span><span class="m">${c.type==='octopus'&&c.octoBal?`餘額 ${money(c.octoBal.bal)} · `:''}${c.type==='octopus'?(()=>{const tu=S.txns.filter(t=>t.channel===c.id&&t.type==='transfer'&&/增值/.test(t.merchant||'')&&t.ts.startsWith(curMonth()));if(!tu.length)return'';const last=tu.reduce((a,b)=>a.ts>b.ts?a:b);return`本月增值 ${money(sum(tu))}（${tu.length} 次，最近 ${last.ts.slice(8,10)}/${last.ts.slice(5,7)} +${money(last.amount)}）· `})():''}${cy.year?'本年度':'本期'} ${cy.label} · 簽賬 ${money(r.spend)} · 預計回贈 ${money(r.total)}${r.rules?r.rules.filter(x=>x.left!=null).map(x=>` · ${esc(x.cats.map(catLabel).join('/'))}額度尚餘 ${money(x.left)}`).join(''):r.capLeft!=null?` · 高回贈額度尚餘 ${money(r.capLeft)}`:''}${r.rebCapLeft!=null?` · 合併回贈上限尚餘 ${money(r.rebCapLeft)}（已用 ${money(r.rebCapUsed)}）`:''}</span>${r.capUsedPct!=null?`<span class="progress" style="display:block;margin-top:6px"><i style="width:${r.capUsedPct}%"></i></span>`:''}${stmtHtml(c)}${feeHtml(c)}</span><span class="faint">›</span></button>${(()=>{const n=catCheckList(c,m).length;return n?`<button class="warn-chip" type="button" data-act="cat-check" data-id="${esc(c.id)}">⚠ ${n} 筆交易要核對分類（影響回贈）</button>`:''})()}`}).join(''):'<div class="empty">未有卡。匯入第一個 Apple Pay 通知或者短訊時會自動加入。</div>'}</div>
+    <div class="list">${S.cards.length?S.cards.map(c=>{const cy=rebateCycle(c),r=calcRebate(c,cardSpend(c,cy),rebateAt(c,cy.s));return`<button class="li" type="button" data-act="edit-card" data-id="${esc(c.id)}" style="flex-wrap:wrap"><span class="grow"><span class="t" style="display:block">${esc(c.name)} <span class="badge">${TYPE_CARD[c.type]||c.type}</span>${c.collect===false?' <span class="badge">唔收集</span>':''}${c.auto?' <span class="badge">自動發現</span>':''}${sameL4(c).length?` <span class="badge">${c.l4Pref?'同尾號 · 優先':'同尾號'}</span>`:''}</span><span class="m">${c.type==='payme'?(()=>{const f=c.fundCard&&S.cards.find(x=>x.id===c.fundCard);const tu=f?S.txns.filter(t=>t.channel===f.id&&t.type==='transfer'&&/payme/i.test(t.merchant||'')&&t.ts.startsWith(curMonth())):[];return f?`增值渠道：${esc(f.name)}${tu.length?` · 本月增值 ${money(sum(tu))}（${tu.length} 次）`:''} · `:'未設定增值用嘅卡 · '})():''}${c.type==='octopus'&&c.octoBal?`餘額 ${money(c.octoBal.bal)} · `:''}${c.type==='octopus'?(()=>{const tu=S.txns.filter(t=>t.channel===c.id&&t.type==='transfer'&&/增值/.test(t.merchant||'')&&t.ts.startsWith(curMonth()));if(!tu.length)return'';const last=tu.reduce((a,b)=>a.ts>b.ts?a:b);return`本月增值 ${money(sum(tu))}（${tu.length} 次，最近 ${last.ts.slice(8,10)}/${last.ts.slice(5,7)} +${money(last.amount)}）· `})():''}${cy.year?'本年度':'本期'} ${cy.label} · 簽賬 ${money(r.spend)} · 預計回贈 ${money(r.total)}${r.rules?r.rules.filter(x=>x.left!=null).map(x=>` · ${esc(x.cats.map(catLabel).join('/'))}額度尚餘 ${money(x.left)}`).join(''):r.capLeft!=null?` · 高回贈額度尚餘 ${money(r.capLeft)}`:''}${r.rebCapLeft!=null?` · 合併回贈上限尚餘 ${money(r.rebCapLeft)}（已用 ${money(r.rebCapUsed)}）`:''}</span>${r.capUsedPct!=null?`<span class="progress" style="display:block;margin-top:6px"><i style="width:${r.capUsedPct}%"></i></span>`:''}${stmtHtml(c)}${feeHtml(c)}</span><span class="faint">›</span></button>${(()=>{const n=catCheckList(c,m).length;return n?`<button class="warn-chip" type="button" data-act="cat-check" data-id="${esc(c.id)}">⚠ ${n} 筆交易要核對分類（影響回贈）</button>`:''})()}`}).join(''):'<div class="empty">未有卡。匯入第一個 Apple Pay 通知或者短訊時會自動加入。</div>'}</div>
   </div>
   <div class="card"><h3>安裝「記帳送出」捷徑</h3>
     <div class="small muted">所有自動化都經呢個捷徑送資料去試算表。安裝時 iPhone 會叫你填網址同密碼；密碼只會存喺捷徑入面，呢個 app 唔會經手亦唔會儲存。</div>
     <button class="btn line" type="button" data-act="copy-url">① 複製試算表網址</button>
     ${scButtons()}
     <div class="small faint">要先做 ① 同 ②。② 裝好之後捷徑名稱係「ledger-send」，③至⑥ 會用呢個名搵佢，所以<b>唔好改名</b>。③至⑥ 已經包含自動化觸發條件（iOS 27 或以上）：裝好之後去捷徑 app 嘅「自動化」頁打開佢哋嘅開關。3 個短訊捷徑分別對應唔同關鍵字，用唔著嘅可以唔裝。</div>
-    <div class="small faint"><b>裝完點返嚟：</b>先試畫面左上角「◀ 記帳簿」。如果記帳 app 停咗喺空白頁：喺 App 切換器將記帳 app 向上掃走，再由主畫面打開，會直接返到「卡與渠道」呢頁，資料唔會唔見。</div>
+    <div class="small faint"><b>裝完點返嚟：</b>先試畫面左上角「◀ 錢跡」。如果記帳 app 停咗喺空白頁：喺 App 切換器將記帳 app 向上掃走，再由主畫面打開，會直接返到「錢包」呢頁，資料唔會唔見。</div>
   </div>
   <div class="card"><h3>設定自動收集（iPhone 捷徑）</h3>
     <div class="small muted">iOS 唔俾網頁讀短訊同通知，所以由捷徑嘅自動化轉交：收到付款通知或者銀行短訊時，捷徑將內容送去你嘅 Google 試算表，app 再讀返。以下用上面嘅安裝掣，大約 3 分鐘完成（需要 iOS 27 或以上）。</div>
@@ -1708,7 +1736,7 @@ function renderCards(){
   const off=$('#gs-off');if(off)arm(off,()=>{disconnect();render();toast('已中斷連接，資料仍然留喺呢部機')},'再按一次確認中斷');
 }
 
-/* ===================== 分類分析 ===================== */
+/* ===================== 報表 ===================== */
 function catTotals(s,e){const tx=inRange(s,e);const K=allCatKeys();const o={};K.forEach(c=>o[c]={amt:0,n:0});const g=k=>o[k]||(isDesig(k)?(o[k]={amt:0,n:0}):o['其他']);tx.forEach(t=>{if(isExp(t)){g(t.category).amt+=t.amount;g(t.category).n++}else if(isRef(t))g(t.category).amt-=t.amount});Object.keys(o).forEach(c=>o[c].amt=r2(o[c].amt));return{o,tx}}
 function renderAnalysis(){
   const{mode,anchor,cat}=ui.ana;const{s,e,label}=range(mode,anchor);
@@ -1732,7 +1760,7 @@ function renderAnalysis(){
       <div class="small muted">${label}所有記錄</div><div class="list">${ctx.map(txRow).join('')||'<div class="empty">冇記錄</div>'}</div></div>`;
   }
   $('#tab-analysis').innerHTML=`
-  <div class="page-head"><div><div class="eyebrow">錢去咗邊，一眼睇晒。</div><h1>分類分析</h1></div></div>
+  <div class="page-head"><div><div class="eyebrow">睇清楚錢去咗邊</div><h1>消費報表</h1></div></div>
   <div class="seg" role="group" aria-label="周期">${['week','month','quarter','year'].map(k=>`<button type="button" data-act="ana-mode" data-mode="${k}" aria-pressed="${mode===k}">${MODE_L[k]}</button>`).join('')}</div>
   <div class="period"><button class="icon-btn" type="button" data-act="ana-prev" aria-label="上一段">‹</button><div class="lbl">${label}</div><button class="icon-btn" type="button" data-act="ana-next" aria-label="下一段">›</button></div>
   <div class="card"><div class="sum-line"><div><div class="small muted">總支出（扣除退款）</div><div class="v num">${money(total)}</div></div><div style="text-align:right">${delta(total,ptotal)}<div class="small faint">對比上一個${MODE_L[mode]} ${money(ptotal)}</div></div></div>
@@ -1936,7 +1964,7 @@ function openBill(id){
         save();closeSheet();render();toast('已儲存定期繳費');
       };
       arm($('#b-stop'),()=>{if(!occurrences(b,'1900-01-01',todayKey(),1).length)S.bills=S.bills.filter(x=>x!==b);else b.endDate=todayKey();save();closeSheet();render();toast('之後唔會再自動記帳')},'再按一次確認停止');
-      arm($('#b-del'),()=>{b.deleted=true;save();closeSheet();render();toast('已移去「已刪除」，喺總覽最底可以復原')});
+      arm($('#b-del'),()=>{b.deleted=true;save();closeSheet();render();toast('已移去「已刪除」，喺首頁最底可以復原')});
     });
 }
 function openIncome(id,src){
@@ -2008,7 +2036,7 @@ function openIncome(id,src){
         save();closeSheet();render();toast('已儲存收入');
       };
       arm($('#i-skip'),()=>{(S.incomeOverrides[id]=S.incomeOverrides[id]||{})[m]='skip';save();closeSheet();render();toast(ml+'已略過呢項')},'再按一次確認');
-      arm($('#i-del'),()=>{tpl.deleted=true;save();closeSheet();render();toast('已移去「已刪除」，喺總覽最底可以復原')},'再按一次確認刪除');
+      arm($('#i-del'),()=>{tpl.deleted=true;save();closeSheet();render();toast('已移去「已刪除」，喺首頁最底可以復原')},'再按一次確認刪除');
       arm($('#i-stop'),()=>{if(startOfKey(schedStart(tpl))>=`${m}-01`)S.incomeTemplates=S.incomeTemplates.filter(x=>x!==tpl);else tpl.endDate=addMonths(m,-1);save();closeSheet();render();toast('已停止')},'再按一次確認停止');
     });
 }
@@ -2034,6 +2062,8 @@ function openCard(id){
       :rule==='hsbc'?`<div class="small faint">滙豐／恒生：截數日如果係星期日就順延到星期一；還款日 ＝ 截數日＋26 日，遇星期六、日或公眾假期順延到下一個工作天。</div>`
       :`<div class="small faint">中銀：截數日唔會順延（星期日都照截）；還款日 ＝ 截數日＋26 日，遇星期六、日或公眾假期順延到下一個工作天。</div>`}
       <div class="small faint">截數日同還款日只係估算，可能同實際差幾日；計唔準時寧願估早啲。預計還款 ＝ 上期截數日之後到今期截數日（包括當日）嘅簽賬減退款。</div>`})():''}
+      ${d.type==='payme'?`<label class="field"><span>增值用嘅卡（PayMe 增值當係呢張卡嘅扣賬）</span><select id="c-fund"><option value="">未設定</option>${S.cards.filter(x=>x.type==='credit'&&x.id!==d.id).map(x=>`<option value="${esc(x.id)}" ${d.fundCard===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
+      <div class="small faint">收到 PayMe「增值」通知，就算冇信用卡通知，都會記做嗰張卡嘅增值：計入嗰張卡嘅預計還款，唔計支出、唔計回贈。PayMe 付款照舊用 PayMe 做渠道。</div>`:''}
       ${d.type==='octopus'?(()=>{const A=octoDefaults(d);return`<h3 style="margin-top:6px">八達通餘額計算</h3>
       <div class="small muted">iPhone 收到「新餘額」通知時，會同上次餘額比較：減少 ＝ 支出；增加 ＝ 增值（自動增值、手動增值、交通津貼都係），照實際增加金額記低，唔計支出／收入，喺「我的卡」同記錄度顯示。</div>
       <div class="row2"><label class="field"><span>自動增值</span><select id="o-on"><option value="1" ${A.on?'selected':''}>有</option><option value="0" ${A.on?'':'selected'}>冇</option></select></label><label class="field"><span>每次自動增值金額（HK$，只用嚟標示名稱）</span><input id="o-amt" inputmode="decimal" value="${esc(A.amt)}" ${A.on?'':'disabled'}></label></div>
@@ -2075,7 +2105,7 @@ function openCard(id){
       <div class="err" id="c-err" hidden></div>
       <div class="actions"><button class="btn" type="button" id="c-save">儲存</button>${isNew?'':'<button class="btn danger" type="button" id="c-del">刪除卡</button>'}</div>`,()=>{
         const val=q=>{const e=document.querySelector(q);return e?e.value.trim():''};
-        const grab=()=>{if($('#rv-m'))R.from=`${$('#rv-y').value}-${pad($('#rv-m').value)}`;if($('#o-on')){const A=octoDefaults(d);A.on=$('#o-on').value==='1';A.amt=num($('#o-amt').value)||0;A.cat=$('#o-cat').value;const b=$('#o-bal').value.trim();if(b!==''&&!isNaN(num(b))&&(!d.octoBal||num(b)!==d.octoBal.bal))d.octoBal={bal:num(b),ts:fmtLocal(new Date())}}R.resetDay=+$('#c-reset').value||1;d.desigs=d.desigs||[];d.desigs.forEach((x,i)=>{const n=document.querySelector(`[data-dn="${i}"]`);if(n){x.name=n.value.trim();x.desc=document.querySelector(`[data-dd="${i}"]`).value.trim()}});if($('#c-per')){R.capPeriod=$('#c-per').value;if($('#c-ys'))R.yearStart=+$('#c-ys').value||1}if($('#c-fee')){d.feeFree=$('#c-fee').value!=='pay';if($('#c-feem'))d.feeMonth=+$('#c-feem').value||null}if($('#c-stmt')){d.stmtDay=+$('#c-stmt').value||null;d.stmtRule=$('#c-srule').value;if($('#c-due')){d.dueDay=+$('#c-due').value||null;d.dueMonth=$('#c-duem').value}}d.name=$('#c-name').value;d.type=$('#c-type').value;d.collect=$('#c-col').checked;d.keywords=$('#c-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);if($('#c-pref'))d.l4Pref=$('#c-pref').checked;
+        const grab=()=>{if($('#rv-m'))R.from=`${$('#rv-y').value}-${pad($('#rv-m').value)}`;if($('#o-on')){const A=octoDefaults(d);A.on=$('#o-on').value==='1';A.amt=num($('#o-amt').value)||0;A.cat=$('#o-cat').value;const b=$('#o-bal').value.trim();if(b!==''&&!isNaN(num(b))&&(!d.octoBal||num(b)!==d.octoBal.bal))d.octoBal={bal:num(b),ts:fmtLocal(new Date())}}R.resetDay=+$('#c-reset').value||1;if($('#c-fund'))d.fundCard=$('#c-fund').value||null;d.desigs=d.desigs||[];d.desigs.forEach((x,i)=>{const n=document.querySelector(`[data-dn="${i}"]`);if(n){x.name=n.value.trim();x.desc=document.querySelector(`[data-dd="${i}"]`).value.trim()}});if($('#c-per')){R.capPeriod=$('#c-per').value;if($('#c-ys'))R.yearStart=+$('#c-ys').value||1}if($('#c-fee')){d.feeFree=$('#c-fee').value!=='pay';if($('#c-feem'))d.feeMonth=+$('#c-feem').value||null}if($('#c-stmt')){d.stmtDay=+$('#c-stmt').value||null;d.stmtRule=$('#c-srule').value;if($('#c-due')){d.dueDay=+$('#c-due').value||null;d.dueMonth=$('#c-duem').value}}d.name=$('#c-name').value;d.type=$('#c-type').value;d.collect=$('#c-col').checked;d.keywords=$('#c-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);if($('#c-pref'))d.l4Pref=$('#c-pref').checked;
           if(R.mode==='tier')R.tiers.forEach((t,i)=>{const l=val(`[data-tl="${i}"]`);t.limit=l===''?'':num(l);t.pct=num(val(`[data-tp="${i}"]`))||0});
           else if(R.mode==='split'){R.basePct=num(val('#c-base'))||0;R.extraPct=num(val('#c-extra'))||0;const c=val('#c-cap');R.extraCap=c===''?'':num(c)}
           else{R.basePct=num(val('#c-base'))||0;if($('#c-rcap')){const rc=val('#c-rcap');R.rebCap=rc===''?'':num(rc);if($('#c-rnet'))R.rebCapNet=$('#c-rnet').checked}R.catRules.forEach((r,i)=>{r.pct=num(val(`[data-rp="${i}"]`))||0;const c=val(`[data-rcap="${i}"]`);r.cap=c===''?'':num(c);const o=val(`[data-rop="${i}"]`);r.overPct=o===''?'':num(o);(r.extras||[]).forEach((x,j)=>{x.pct=num(val(`[data-xp="${i}-${j}"]`))||0;const xc=val(`[data-xc="${i}-${j}"]`);x.cap=xc===''?'':num(xc)})})}};
@@ -2129,7 +2159,7 @@ function openCatCheck(id){
 }
 function openImport(){
   openSheet('匯入通知',`
-    ${CONN?'':'<div class="small muted">想自動更新？去「卡與渠道」連接 Google 試算表。</div>'}
+    ${CONN?'':'<div class="small muted">想自動更新？去「錢包」連接 Google 試算表。</div>'}
     <div class="small muted">揀返捷徑寫入嘅 <b>記帳/inbox.txt</b>（喺 iCloud 雲碟 › Shortcuts）。成個檔每次揀都得，已匯入過嘅行會自動略過。</div>
     <button class="btn" type="button" id="im-file">揀選通知檔</button>
     <label class="field"><span>或者直接貼上銀行短訊 / 通知內容（每段一筆）</span><textarea id="im-text" placeholder="例如：你的信用卡(尾號8821)於10月08日在CAFE DE CORAL簽賬HKD110.00"></textarea></label>
@@ -2159,7 +2189,7 @@ document.addEventListener('click',e=>{
   else if(a==='edit-bill')openBill(b.dataset.id);
   else if(a==='ckw-edit')openKwEdit(b.dataset.k);
   else if(a==='recat')openRecat();
-  else if(a==='fx-del'||a==='fx-restore'){const L=b.dataset.k==='bill'?S.bills:S.incomeTemplates;const x=L.find(y=>y.id===b.dataset.id);if(!x)return;if(a==='fx-del')x.deleted=true;else delete x.deleted;save();render();toast(a==='fx-del'?'已移去「已刪除」，喺總覽最底可以復原':'已復原')}
+  else if(a==='fx-del'||a==='fx-restore'){const L=b.dataset.k==='bill'?S.bills:S.incomeTemplates;const x=L.find(y=>y.id===b.dataset.id);if(!x)return;if(a==='fx-del')x.deleted=true;else delete x.deleted;save();render();toast(a==='fx-del'?'已移去「已刪除」，喺首頁最底可以復原':'已復原')}
   else if(a==='fx-purge'){if(b.dataset.armed!=='1'){b.dataset.armed='1';b.textContent='再按一次確認';setTimeout(()=>{if(b.isConnected){b.dataset.armed='';b.textContent='永久刪除'}},3000);return}
     if(b.dataset.k==='bill'){S.bills=S.bills.filter(y=>y.id!==b.dataset.id);delete S.billOverrides[b.dataset.id]}else{S.incomeTemplates=S.incomeTemplates.filter(y=>y.id!==b.dataset.id);delete S.incomeOverrides[b.dataset.id]}save();render();toast('已永久刪除')}
   else if(a==='new-tx')openExpense('single');
@@ -2199,11 +2229,11 @@ document.addEventListener('click',e=>{
   else if(a==='copy-url'){if(!CONN){toast('未連接 Google 試算表，冇網址可以複製');return}const u=CONN.url;try{navigator.clipboard.writeText(u).then(()=>toast('已複製網址'),()=>toast(u))}catch(err){toast(u)}}
   else if(a==='copy-file'){const f=b.dataset.f,t=FILE_CACHE[f];if(!t){preloadFiles();toast('載入緊，請再撳一次；唔得就撳下面連結打開');return}try{navigator.clipboard.writeText(t).then(()=>toast(`已複製 ${f.replace('.txt','')}`),()=>toast('複製唔到，請撳下面連結打開再拷貝'))}catch(err){toast('複製唔到，請撳下面連結打開再拷貝')}}
   else if(a==='copy'){const t=$('#'+b.dataset.src).textContent;try{navigator.clipboard.writeText(t).then(()=>toast('已複製'),()=>selectText(b.dataset.src))}catch(err){selectText(b.dataset.src)}}
-  else if(a==='export-xlsx')saveFile(exportExcel(),`記帳簿-${todayKey()}.xlsx`);
-  else if(a==='export-json')saveFile(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}),`記帳簿備份-${todayKey()}.json`);
+  else if(a==='export-xlsx')saveFile(exportExcel(),`錢跡-${todayKey()}.xlsx`);
+  else if(a==='export-json')saveFile(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}),`錢跡備份-${todayKey()}.json`);
   else if(a==='restore')$('#file-backup').click();
-  else if(a==='export-cards')saveFile(new Blob([JSON.stringify(settingsPack(true),null,1)],{type:'application/json'}),`記帳簿卡設定-${todayKey()}.json`);
-  else if(a==='export-settings')saveFile(new Blob([JSON.stringify(settingsPack(false),null,1)],{type:'application/json'}),`記帳簿設定-${todayKey()}.json`);
+  else if(a==='export-cards')saveFile(new Blob([JSON.stringify(settingsPack(true),null,1)],{type:'application/json'}),`錢跡卡設定-${todayKey()}.json`);
+  else if(a==='export-settings')saveFile(new Blob([JSON.stringify(settingsPack(false),null,1)],{type:'application/json'}),`錢跡設定-${todayKey()}.json`);
   else if(a==='restore-settings')$('#file-settings').click();
   else if(a==='open-import')openImport();
   else if(a==='sync-now')syncPull(true);
@@ -2223,9 +2253,9 @@ function selectText(id){const r=document.createRange();r.selectNodeContents($('#
 $('#file-inbox').onchange=async e=>{const f=e.target.files[0];if(!f)return;const t=await f.text();e.target.value='';showImportResult(importText(t))};
 $('#file-settings').onchange=async e=>{const f=e.target.files[0];if(!f)return;e.target.value='';try{const o=JSON.parse(await f.text());
   if(o&&(o.kind==='ledger-settings'||o.kind==='ledger-cards'))openRestoreSettings(o);
-  else if(o&&Array.isArray(o.txns))openRestoreSettings(Object.assign(settingsPackFrom(o),{at:'（完整備份）'}));else throw 0}catch(err){toast('呢個唔係記帳簿設定檔')}};
+  else if(o&&Array.isArray(o.txns))openRestoreSettings(Object.assign(settingsPackFrom(o),{at:'（完整備份）'}));else throw 0}catch(err){toast('呢個唔係錢跡設定檔')}};
 function settingsPackFrom(st){const keep=S;try{S=hydrate(st);return settingsPack(false)}finally{S=keep}}
-$('#file-backup').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(!o||!Array.isArray(o.txns))throw 0;S=hydrate(o);save();render();toast(`已還原 ${S.txns.length} 筆記錄`)}catch(err){toast('呢個唔係記帳簿備份檔')}e.target.value=''};
+$('#file-backup').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(!o||!Array.isArray(o.txns))throw 0;S=hydrate(o);save();render();toast(`已還原 ${S.txns.length} 筆記錄`)}catch(err){toast('呢個唔係錢跡備份檔')}e.target.value=''};
 $('#btn-hide').onclick=()=>{S.settings.hideIncome=!S.settings.hideIncome;save();render()};
 $('#btn-import').onclick=()=>CONN?syncPull(true):openImport();
 document.querySelectorAll('.tabbar [data-tab]').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
