@@ -267,7 +267,7 @@ main{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.28-61';
+const APP_VERSION='2026.10.28-62';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1367,6 +1367,36 @@ async function syncPull(manual){
   }catch(e){net.state='err';net.err=e.message;if(manual){hideBusy();toast('同步失敗：'+e.message)}}
   pulling=false;softRender();
 }
+// 收件箱搜尋：睇某一行點處理（記咗邊筆／喺垃圾筒／點解略過），可以單獨重新讀取
+const lineHit=(t,line)=>(t.raw||[]).some(x=>x&&(x===line||line.includes(x)||x.includes(line.slice(0,60))));
+function whyLine(line){
+  const r=parseInbox(line)[0];if(!r)return'格式唔啱，讀唔到';
+  const tx=S.txns.find(t=>lineHit(t,line));if(tx)return{tx};
+  const tr=S.trash.find(e=>e.kind==='txn'&&e.item&&lineHit(e.item,line));if(tr)return{tr};
+  const ie=S.incomeEntries.find(e=>lineHit(e,line));if(ie)return'已記做收入（定期收入卡）';
+  const words=k=>String(S.settings[k]||'').split(/[,，、\n]/).map(x=>x.trim()).filter(Boolean);
+  if(r.kind==='sms'){if(!S.channels.sms)return'「銀行短訊」收集已關閉';const w=words('smsBlock').find(w=>line.toLowerCase().includes(w.toLowerCase()));if(w)return`短訊略過字眼「${w}」`;
+    try{const o=recToTxn(r);if(o.skip)return o.skip}catch(e){return'讀唔到：'+e.message}}
+  if(r.kind==='mail'){if(mailBlocked(line))return'電郵寄件人喺黑名單／略過字眼'}
+  if(r.kind==='ocr'){if(notifBlocked(line))return'通知略過字眼'}
+  return S.imported[hash(line)]?'之前讀過但冇產生記錄（可能係重複、驗證碼或者唔似交易）':'未處理';
+}
+async function openInboxFind(q){
+  if(!CONN){toast('要先連接 Google 試算表');return}
+  let rows=window.__ibRows;
+  if(!rows){showBusy('讀取收件箱中…');try{const res=await api(null,{action:'pull',since:0,ver:SYNC.ver});rows=window.__ibRows=(res.rows||[]).map(x=>x[1]);hideBusy()}catch(e){hideBusy();toast('讀取失敗：'+e.message);return}}
+  q=q||'';const L=q?rows.filter(l=>l.toLowerCase().includes(q.toLowerCase())).slice(-30).reverse():[];
+  openSheet('收件箱搜尋',`<div class="small muted">輸入短訊／通知／電郵入面嘅字，例如卡尾號「0114」、「Alipay」或者金額。會列出收件箱入面相符嘅行，同埋 app 點處理咗佢。</div>
+    <div class="quick"><input id="ib-q" value="${esc(q)}" placeholder="例如：0114" autocapitalize="off"><button class="btn" type="button" id="ib-go">搜尋</button></div>
+    ${q?(L.length?`<div class="list">${L.map((l,i)=>{const w=whyLine(l);const st=typeof w==='string'?`<b style="color:var(--red)">${esc(w)}</b>`:w.tx?`✓ 已記錄：${esc(w.tx.merchant)} · ${money(w.tx.amount)} · ${esc(TYPE_L[w.tx.type]||w.tx.type)} · ${ST_L[w.tx.status]||''}`:`喺垃圾筒（${esc(w.tr.reason||'已刪除')}）`;
+      return`<div class="li" style="display:block"><div class="small" style="overflow-wrap:anywhere">${esc(l.slice(0,220))}</div><div class="small" style="margin:4px 0">${st}</div><div class="actions">${typeof w!=='string'&&w.tx?`<button class="btn sm ghost" type="button" data-ib-open="${esc(w.tx.id)}">打開記錄</button>`:''}${typeof w!=='string'&&w.tr?`<button class="btn sm ghost" type="button" data-ib-restore="${esc(w.tr.id)}">由垃圾筒還原</button>`:''}${typeof w==='string'?`<button class="btn sm" type="button" data-ib-redo="${i}">重新讀取呢行</button>`:''}</div></div>`}).join('')}</div>`:'<div class="empty">收件箱冇相符嘅行。即係捷徑／Gmail 冇送到嚟，請檢查捷徑自動化或者短訊關鍵字。</div>'):''}`,()=>{
+    const go=()=>openInboxFind($('#ib-q').value.trim());$('#ib-go').onclick=go;$('#ib-q').onkeydown=e=>{if(e.key==='Enter')go()};
+    document.querySelectorAll('[data-ib-open]').forEach(b=>b.onclick=()=>{closeSheet();openEditTx(b.dataset.ibOpen)});
+    document.querySelectorAll('[data-ib-restore]').forEach(b=>b.onclick=()=>{const e=S.trash.find(x=>x.id===b.dataset.ibRestore);if(e){trashRestore(e);S.trash=S.trash.filter(x=>x!==e);save();render();toast('已還原')}openInboxFind(q)});
+    document.querySelectorAll('[data-ib-redo]').forEach(b=>b.onclick=()=>{const l=L[+b.dataset.ibRedo];delete S.imported[hash(l)];const r=importText(l,{reread:true});save();render();
+      toast(r.added||r.income||r.merged?`已讀取：新增 ${r.added} 筆${r.income?`、收入 ${r.income} 筆`:''}${r.merged?`、合併 ${r.merged} 筆`:''}`:'仍然讀唔到（原因見上面）');openInboxFind(q)});
+  });
+}
 async function rereadInbox(){
   if(!CONN){toast('要先連接 Google 試算表');return}
   showBusy('重新分析收件箱中…');
@@ -1646,6 +1676,7 @@ function renderCards(){
     ${CONN?`<div class="small muted">${statusHtml().replace(/<[^>]+>/g,' ')}</div>
       ${SYNC.sheetUrl?`<a class="btn ghost" style="text-align:center;text-decoration:none" href="${esc(SYNC.sheetUrl)}" target="_blank" rel="noopener">打開試算表</a>`:''}
       <button class="btn line" type="button" data-act="reread">重新分析收件箱（補返之前讀唔到嘅記錄）</button>
+      <button class="btn line" type="button" data-act="inbox-find">收件箱搜尋（搵唔到某筆記錄時用）</button>
       <div class="actions"><button class="btn" type="button" data-act="sync-now">立即同步</button><button class="btn line" type="button" id="gs-off">中斷連接</button></div>
       <div class="small faint">喺 app 入面改嘅記錄會自動寫入試算表嘅「交易記錄」等工作表。試算表嗰邊嘅工作表係鏡像，喺嗰度改會俾 app 覆蓋，請喺 app 改。</div>`
     :`<div class="small muted">接上之後：捷徑直接送交易去試算表、app 每 60 秒自動更新、試算表就係你嘅 Excel。資料會存喺你自己嘅 Google 帳戶。</div>
@@ -2239,6 +2270,7 @@ document.addEventListener('click',e=>{
   else if(a==='sync-now')syncPull(true);
   else if(a==='check-update')checkUpdate(true);
   else if(a==='reread')rereadInbox();
+  else if(a==='inbox-find'){window.__ibRows=null;openInboxFind('')}
 });
 // 安裝捷徑檔：同 2026.10.18-23 一樣，直接打開 GitHub 上面嘅 .shortcut 檔
 const APP_URL=location.protocol.startsWith('http')?location.origin+location.pathname.replace(/[^/]*$/,''):'（喺 GitHub 打開就會顯示）';
