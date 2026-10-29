@@ -267,7 +267,7 @@ main{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.28-62';
+const APP_VERSION='2026.10.29-64';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -757,6 +757,17 @@ function findMatch(t){
   return{};
 }
 /* 通知截圖（PayMe／轉數快／錢包）解析：只抽有金額同收付款字眼嘅通知，其他 app 一律略過 */
+// 外幣：預設匯率（1 單位 ＝ 幾多港元，2026-10-29 中價，可以喺「錢包 → 外幣匯率」或者逐筆改）
+const FX_DEF={USD:7.845,CNY:1.177,JPY:0.0497,EUR:8.736,GBP:10.442,AUD:5.531,CAD:5.606,SGD:6.12,NZD:4.4125,CHF:9.461,THB:0.2337,MOP:0.9739,TWD:0.242,KRW:0.0057};
+const FX_NAME={HKD:'港元',USD:'美元',CNY:'人民幣',JPY:'日圓',EUR:'歐元',GBP:'英鎊',AUD:'澳元',CAD:'加元',SGD:'新加坡元',NZD:'紐西蘭元',CHF:'瑞士法郎',THB:'泰銖',MOP:'澳門幣',TWD:'新台幣',KRW:'韓圜'};
+const FX_PAT=[['USD','USD|US\\$|美元|美金'],['CNY','CNY|CNH|RMB|人民幣|¥|￥'],['JPY','JPY|日圓|日元|円'],['EUR','EUR|€|歐元|歐羅'],['GBP','GBP|£|英鎊'],['AUD','AUD|A\\$|澳元'],['CAD','CAD|C\\$|加元'],['SGD','SGD|S\\$|新加坡元|星元'],['NZD','NZD|NZ\\$|紐元'],['CHF','CHF|瑞士法郎'],['THB','THB|泰銖|฿'],['MOP','MOP\\$?|澳門幣|葡幣'],['TWD','TWD|NT\\$|新台幣|台幣'],['KRW','KRW|₩|韓圜|韓元']];
+const fxRate=c=>+(((S.settings||{}).fx||{})[c])||FX_DEF[c]||1;
+function fxDetect(text){const t=String(text||'');
+  for(const[c,p]of FX_PAT){const m=t.match(new RegExp('(?:'+p+')\\s*([\\d,]+(?:\\.\\d{1,2})?)','i'))||t.match(new RegExp('([\\d,]+(?:\\.\\d{1,2})?)\\s*(?:'+p+')(?![a-z])','i'));
+    if(m){const amt=num(m[1]);if(amt>0){const rest=t.replace(m[0],' ');const hkd=/(HK\$|HKD|港幣|港元)\s*\d|\d\s*(HKD|港元|港幣)|(^|[^A-Za-z$])\$\s*\d/i.test(rest.replace(/(US|S|A|C|NT|NZ|MOP)\$/gi,''));return{cur:c,amt,raw:m[0],hkd}}}}
+  return null}
+let LINE_FX=null;
+function attachFx(t){if(!LINE_FX||t.cur)return;t.cur=LINE_FX.cur;t.fxAmt=LINE_FX.amt;t.fxRate=LINE_FX.hkd?r2(t.amount/LINE_FX.amt*1e4)/1e4:fxRate(LINE_FX.cur)}
 const AMT_RE=/(?:HK\$|HKD|\$|港幣|港元)\s*([\d,]+(?:\.\d{1,2})?)|([\d,]+(?:\.\d{1,2})?)\s*(?:HKD|港元|港幣|蚊)/i;
 const IN_RE=/(收到|已收|向[你您]付款|向[你您]轉|轉賬給[你您]|轉帳給[你您]|轉賬予[你您]|轉帳予[你您]|付款給[你您]|付款予[你您]|俾咗[你您]|畀咗[你您]|received|sent you|paid you|has sent you|已存入|存入[你您]|入賬|轉入|已收款|收到一筆款項|credited|收款(?!人|方))/i;
 const OUT_RE=/([你您]已向|已向(?![你您])|[你您]向(?![你您])|付款至|付款予(?![你您])|轉賬至|轉帳至|轉賬到|轉帳到|you paid|you sent|paid to(?! you)|sent to(?! you)|已支付|支付了|付款成功|已付款|轉賬成功|轉帳成功|成功轉賬|成功轉帳|成功付款|payment successful|transfer successful|轉出|轉帳給(?![你您])|轉賬給(?![你您])|付款給(?![你您])|debited|扣賬|扣款)/i;
@@ -869,7 +880,7 @@ function addIncomeAuto(e,res){
   const dup=S.txns.find(x=>x.type==='income'&&!x.linkTpl&&Math.abs(x.amount-e.amount)<0.005&&Math.abs(toDate(x.ts)-toDate(e.ts))/36e5<=W&&(!(x.sources||[x.source]).includes(e.src)||(merchantSim(x.merchant,e.name)>=0.8&&Math.abs(toDate(x.ts)-toDate(e.ts))/36e5<=0.25)));
   if(dup){dup.raw=[...(dup.raw||[]),e.raw];dup.sources=[...new Set([...(dup.sources||[dup.source]),e.src])];if(res)res.merged++;return dup}
   const n={id:uid(),ts:e.ts,amount:r2(e.amount),merchant:e.name,category:'其他',channel:'bank',type:'income',status:'confirmed',source:e.src,sources:[e.src],raw:[e.raw],note:/(支票|cheque|\bchq\b)/i.test(e.raw||'')?'單一收入；支票':'單一收入',catChecked:true};
-  S.txns.push(n);if(res)res.income++;return n;
+  attachFx(n);S.txns.push(n);if(res)res.income++;return n;
 }
 function ingest(t,rawLine,res){
   t.raw=[rawLine];
@@ -891,14 +902,14 @@ function ingest(t,rawLine,res){
     else if(t.byL4&&!t.l4Amb){c.channel=t.channel;c.byL4=true;delete c.l4Amb}
     else if(t.byL4&&t.l4Amb){if(!t.l4Amb.includes(c.channel)||c.l4Guess){c.channel=t.channel;c.l4Amb=t.l4Amb;c.l4Guess=true}c.byL4=true}
     else if(c.l4Guess&&c.l4Amb&&c.l4Amb.includes(t.channel)){c.channel=t.channel;delete c.l4Guess}
-    betterInfo(c,t);
+    betterInfo(c,t);attachFx(c);
     if(c.status!=='confirmed')c.status=c.category==='其他'?'pending':'confirmed';
     res.merged++;
   }else{
     const nt={id:uid(),note:'',...t,category:categorize(t.merchant),status:(t.type==='transfer'||t.type==='void')?'confirmed':(both&&(Date.now()-toDate(t.ts))/36e5<S.settings.mergeHours?'processing':'pending'),sources:[t.source]};
     const mb=matchBill(nt);
     if(mb){if(Math.abs(mb.expected-nt.amount)<0.005){nt.linkBill={bid:mb.b.id,key:mb.key};nt.status='confirmed';nt.note='對應定期支出，金額一樣，已自動確認'}else{nt.suggestBill={bid:mb.b.id,key:mb.key};nt.status='pending'}}
-    S.txns.push(nt);res.added++;
+    attachFx(nt);S.txns.push(nt);res.added++;
     if(fm.review){nt.status='pending';if(fm.review.status!=='confirmed')fm.review.status='pending';S.reviews.push({id:uid(),a:fm.review.id,b:nt.id,kind:fm.kind,resolved:false});res.review++}
   }
 }
@@ -907,7 +918,7 @@ const WALLET_RE=/(payme|八達通|octopus|alipay|支付寶|wechat|微信|tap ?& 
 function parseBankMail(text){
   const t=String(text);
   const core=t.split(/\s*¦\s*/).filter(x=>!/(推廣|優惠|promotion|promo|獎賞|reward|送禮|賺取|登記|條款|terms)/i.test(x)).join(' ¦ ');
-  const isCard=/(信用卡交易通知|credit card transaction|card transaction|簽賬通知|信用卡.{0,12}(簽賬|交易|消費))/i.test(core);
+  const isCard=/(信用卡交易通知|credit card transaction|card transaction|簽賬通知|信用卡.{0,12}(簽賬|交易|消費))/i.test(core)||(/(交易通知|transaction notification)/i.test(core)&&/(信用卡|credit card|card account|card number|卡號|尾號)/i.test(core));
   const isDD=/(直接付款授權|direct debit|edda|直接扣賬)/i.test(t);
   // 銀行付款通知：有「付款／轉賬金額」同「受款人／收款人」，即使冇寫明直接付款授權都當係由戶口付款
   // 銀行轉賬通知（例如恒生「Transfer Amount 轉賬金額」）：就算冇寫收款人都當係轉賬
@@ -1068,6 +1079,9 @@ function importText(text,opts={}){
     const h=hash(r.line);const prev=S.imported[h];
     if(prev&&!(opts.reread&&(prev==='s'||!producedBy(r.line)))){res.dupe++;continue}
     S.imported[h]='s';
+    LINE_FX=fxDetect(r.parts.slice(1).join(' || '));
+    // 外幣：冇港元金額就用匯率換算；有埋港元金額（銀行已換算）就用港元，外幣金額只作記錄
+    if(LINE_FX){const L2=r.line.replace(LINE_FX.raw,LINE_FX.hkd?' ':`HKD ${r2(LINE_FX.amt*fxRate(LINE_FX.cur))}`);const r2_=parseInbox(L2)[0];if(r2_)r.parts=r2_.parts}
     if(r.kind==='ocr'||r.kind==='mail'){
       const src=r.kind==='mail'?'mail':'notif';
       if(!S.channels[src]){res.skipped++;continue}
@@ -1099,7 +1113,7 @@ function importText(text,opts={}){
     if(o.t.type==='income'||(o.t.type==='transfer'&&matchIncomeTpl(r.line,o.t.ts)&&/(存入|入賬|credited|deposit|收到|received|薪金|salary|payroll|出糧)/i.test(r.line))){routeIncome({ts:o.t.ts,amount:o.t.amount,name:o.t.merchant,src:o.t.source,raw:r.line},res,r.line);continue}
     ingest(o.t,r.line,res);
   }
-  S.lastImport=fmtLocal(new Date());
+  LINE_FX=null;S.lastImport=fmtLocal(new Date());
   save();return res;
 }
 function refreshStatuses(){
@@ -1476,7 +1490,7 @@ const masked=v=>S.settings.hideIncome?'<span class="hidden-v">＊＊＊＊</span
 
 function txRow(t){
   const d=toDate(t.ts);const merged=(t.sources||[]).length>1;
-  return `<button class="li" type="button" data-act="edit" data-id="${esc(t.id)}"><span class="dot ${t.status}" aria-label="${ST_L[t.status]}"></span><span class="grow"><span class="t" style="display:block">${esc(t.merchant||'（冇描述）')}</span><span class="m">${t.noDay?'未指定日子':`${pad(d.getHours())}:${pad(d.getMinutes())}`} · ${catChip(t.category)} · ${esc(chName(t.channel))}${merged?' · 已合併':''}${t.source==='fixed'?' · 定期繳費':''}${t.linkTpl?` · 對應「${esc((S.incomeTemplates.find(x=>x.id===t.linkTpl)||{}).name||'收入')}」${+t.linkMonth.slice(5)}月`:''}${t.linkBill?` · 對應定期支出「${esc((S.bills.find(x=>x.id===t.linkBill.bid)||{}).name||'')}」`:''}</span></span><span class="amt num ${t.type}">${t.type==='refund'||t.type==='income'?'+':''}${money(t.amount)}</span></button>`;
+  return `<button class="li" type="button" data-act="edit" data-id="${esc(t.id)}"><span class="dot ${t.status}" aria-label="${ST_L[t.status]}"></span><span class="grow"><span class="t" style="display:block">${esc(t.merchant||'（冇描述）')}</span><span class="m">${t.noDay?'未指定日子':`${pad(d.getHours())}:${pad(d.getMinutes())}`} · ${catChip(t.category)} · ${esc(chName(t.channel))}${t.cur&&t.cur!=='HKD'?` · ${t.cur} ${(+t.fxAmt||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`:''}${merged?' · 已合併':''}${t.source==='fixed'?' · 定期繳費':''}${t.linkTpl?` · 對應「${esc((S.incomeTemplates.find(x=>x.id===t.linkTpl)||{}).name||'收入')}」${+t.linkMonth.slice(5)}月`:''}${t.linkBill?` · 對應定期支出「${esc((S.bills.find(x=>x.id===t.linkBill.bid)||{}).name||'')}」`:''}</span></span><span class="amt num ${t.type}">${t.type==='refund'||t.type==='income'?'+':''}${money(t.amount)}</span></button>`;
 }
 
 /* ===================== 首頁 ===================== */
@@ -1700,6 +1714,11 @@ function renderCards(){
     <label class="field"><span>短訊：包含以下字眼就略過（推廣／詐騙，用逗號分隔）</span><input id="sms-block" value="${esc(S.settings.smsBlock||'')}" placeholder="例如：優惠, 推廣, 中獎, 點擊連結, 貸款"></label>
     <label class="field"><span>Apple Pay 同短訊合併時間範圍</span><select id="merge-h">${[2,6,12,24,48].map(h=>`<option value="${h}" ${S.settings.mergeHours===h?'selected':''}>${h} 小時內同金額就當係同一筆候選</option>`).join('')}</select></label>
   </div>
+  <details class="card"><summary style="cursor:pointer"><b>外幣匯率</b> <span class="small muted">（1 單位 ＝ 幾多港元，撳開修改）</span></summary>
+    <div class="small muted">短訊／通知／電郵寫住外幣（例如 CNY、USD、JPY）會自動用呢度嘅匯率換算做港元；每筆記錄都可以再改。預設係 2026 年 10 月 29 日嘅中價。</div>
+    <div class="grid2" style="gap:8px">${Object.keys(FX_DEF).map(c=>`<label class="field"><span>${c} ${FX_NAME[c]}</span><input data-fx="${c}" inputmode="decimal" value="${esc(fxRate(c))}"></label>`).join('')}</div>
+    <button class="btn sm line" type="button" data-act="fx-reset">還原預設匯率</button>
+  </details>
   <div class="card"><div class="card-head"><h3>我的卡（本期回贈）</h3><button class="btn sm ghost" type="button" data-act="add-card">＋ 新增卡</button></div>
     <div class="list">${S.cards.length?S.cards.map(c=>{const cy=rebateCycle(c),r=calcRebate(c,cardSpend(c,cy),rebateAt(c,cy.s));return`<button class="li" type="button" data-act="edit-card" data-id="${esc(c.id)}" style="flex-wrap:wrap"><span class="grow"><span class="t" style="display:block">${esc(c.name)} <span class="badge">${TYPE_CARD[c.type]||c.type}</span>${c.collect===false?' <span class="badge">唔收集</span>':''}${c.auto?' <span class="badge">自動發現</span>':''}${sameL4(c).length?` <span class="badge">${c.l4Pref?'同尾號 · 優先':'同尾號'}</span>`:''}</span><span class="m">${c.type==='payme'?(()=>{const f=c.fundCard&&S.cards.find(x=>x.id===c.fundCard);const tu=f?S.txns.filter(t=>t.channel===f.id&&t.type==='transfer'&&/payme/i.test(t.merchant||'')&&t.ts.startsWith(curMonth())):[];return f?`增值渠道：${esc(f.name)}${tu.length?` · 本月增值 ${money(sum(tu))}（${tu.length} 次）`:''} · `:'未設定增值用嘅卡 · '})():''}${c.type==='octopus'&&c.octoBal?`餘額 ${money(c.octoBal.bal)} · `:''}${c.type==='octopus'?(()=>{const tu=S.txns.filter(t=>t.channel===c.id&&t.type==='transfer'&&/增值/.test(t.merchant||'')&&t.ts.startsWith(curMonth()));if(!tu.length)return'';const last=tu.reduce((a,b)=>a.ts>b.ts?a:b);return`本月增值 ${money(sum(tu))}（${tu.length} 次，最近 ${last.ts.slice(8,10)}/${last.ts.slice(5,7)} +${money(last.amount)}）· `})():''}${cy.year?'本年度':'本期'} ${cy.label} · 簽賬 ${money(r.spend)} · 預計回贈 ${money(r.total)}${r.rules?r.rules.filter(x=>x.left!=null).map(x=>` · ${esc(x.cats.map(catLabel).join('/'))}額度尚餘 ${money(x.left)}`).join(''):r.capLeft!=null?` · 高回贈額度尚餘 ${money(r.capLeft)}`:''}${r.rebCapLeft!=null?` · 合併回贈上限尚餘 ${money(r.rebCapLeft)}（已用 ${money(r.rebCapUsed)}）`:''}</span>${r.capUsedPct!=null?`<span class="progress" style="display:block;margin-top:6px"><i style="width:${r.capUsedPct}%"></i></span>`:''}${stmtHtml(c)}${feeHtml(c)}</span><span class="faint">›</span></button>${(()=>{const n=catCheckList(c,m).length;return n?`<button class="warn-chip" type="button" data-act="cat-check" data-id="${esc(c.id)}">⚠ ${n} 筆交易要核對分類（影響回贈）</button>`:''})()}`}).join(''):'<div class="empty">未有卡。匯入第一個 Apple Pay 通知或者短訊時會自動加入。</div>'}</div>
   </div>
@@ -1759,6 +1778,7 @@ function renderCards(){
   </div>`;
   document.querySelectorAll('[data-ch]').forEach(i=>i.onchange=()=>{S.channels[i.dataset.ch]=i.checked;save();toast(i.checked?'已開啟收集':'已停止收集')});
   $('#mail-block').onchange=e=>{S.settings.mailBlock=e.target.value;const n=cleanBlockedMail();save();render();toast(n?`已儲存，${n} 筆推廣電郵記錄移咗去垃圾筒`:'已儲存')};
+  document.querySelectorAll('[data-fx]').forEach(i=>i.onchange=()=>{const v=num(i.value);S.settings.fx=S.settings.fx||{};if(v>0)S.settings.fx[i.dataset.fx]=v;else delete S.settings.fx[i.dataset.fx];save();toast(`已更新 ${i.dataset.fx} 匯率（新記錄會用）`)});
   $('#notif-block').onchange=e=>{S.settings.notifBlock=e.target.value;const n=cleanBlockedNotif();save();render();toast(n?`已儲存，${n} 筆通知記錄移咗去垃圾筒`:'已儲存')};
   $('#sms-block').onchange=e=>{S.settings.smsBlock=e.target.value;const n=cleanBlockedSms();save();render();toast(n?`已儲存，${n} 筆短訊記錄移咗去垃圾筒`:'已儲存')};
   $('#merge-h').onchange=e=>{S.settings.mergeHours=+e.target.value;save();toast('已更新合併範圍')};
@@ -1876,6 +1896,8 @@ function openEditTx(id){
   const billOpts=sel=>`<option value="">唔對應（普通支出）</option>${S.bills.filter(x=>x.id===sel||(!x.deleted&&!isSuperseded(x)&&!isStopped(x))).map(x=>`<option value="${x.id}" ${sel===x.id?'selected':''}>${esc(x.name)}（${cycleText(x)} $${x.amount}）</option>`).join('')}`;
   const pm=t.linkMonth||payMonth(t.ts);
   openSheet(unconf?'核實記錄':'修改記錄',`
+    <div class="row2"><label class="field"><span>貨幣</span><select id="f-cur">${Object.keys(FX_NAME).map(c=>`<option value="${c}" ${(t.cur||'HKD')===c?'selected':''}>${c} ${FX_NAME[c]}</option>`).join('')}</select></label><label class="field" id="f-fxamt-w" ${(t.cur||'HKD')==='HKD'?'hidden':''}><span>原幣金額</span><input id="f-fxamt" inputmode="decimal" value="${esc(t.fxAmt??'')}"></label></div>
+    <div class="row2" id="f-fxrate-w" ${(t.cur||'HKD')==='HKD'?'hidden':''}><label class="field"><span>匯率（1 <span id="f-curl">${esc(t.cur||'')}</span> ＝ ? HKD）</span><input id="f-fxrate" inputmode="decimal" value="${esc(t.fxRate??(t.cur?fxRate(t.cur):''))}"></label><div class="small faint" style="align-self:end;padding-bottom:12px">預設用主流匯率，可以改；港元金額會自動計</div></div>
     <div class="row2"><label class="field"><span>金額 (HKD)</span><input id="f-amt" inputmode="decimal" value="${esc(t.amount)}"></label><label class="field" id="f-time-w" ${t.noDay?'hidden':''}><span>時間</span><input type="time" id="f-time" value="${t.noDay?'12:00':t.ts.slice(11,16)}"></label></div>
     <div class="field"><span>日期（日子可以唔揀）</span>${dateFields('f-date',t.noDay?t.ts.slice(0,7):t.ts.slice(0,10))}</div>
     <label class="field"><span>商戶 / 描述</span><input id="f-mer" value="${esc(t.merchant)}"></label>
@@ -1891,10 +1913,14 @@ function openEditTx(id){
     <div class="err" id="f-err" hidden></div>
     <div class="actions"><button class="btn" type="button" id="f-save">${unconf?'確認':'儲存'}</button><button class="btn danger" type="button" id="f-del">刪除</button></div>`,()=>{
       const ds=$('#f-date [data-p="d"]');ds.onchange=()=>{$('#f-time-w').hidden=!ds.value};
+      {const cur=$('#f-cur'),fa=$('#f-fxamt'),fr=$('#f-fxrate'),calc=()=>{if(cur.value!=='HKD'){const a=num(fa.value),r=num(fr.value);if(a>0&&r>0)$('#f-amt').value=r2(a*r)}};
+       cur.onchange=()=>{const f=cur.value==='HKD';$('#f-fxamt-w').hidden=f;$('#f-fxrate-w').hidden=f;$('#f-curl').textContent=cur.value;if(!f){fr.value=fxRate(cur.value);if(!fa.value){const h=num($('#f-amt').value);if(h>0)fa.value=r2(h/fxRate(cur.value))}calc()}};
+       fa.oninput=calc;fr.oninput=calc}
       $('#f-ch').addEventListener('change',()=>{const v=$('#f-cat').value;$('#f-cat').innerHTML=catOptions(v,$('#f-ch').value);if(!$('#f-cat').value)$('#f-cat').value='其他';$('#f-cat-hint').textContent=cardDesigKeys(S.cards.find(x=>x.id===$('#f-ch').value)).length?'紅色 ★ 係呢張卡嘅指定類別':''});
       $('#f-type').onchange=()=>{const v=$('#f-type').value;$('#f-inc-w').hidden=v!=='income';$('#f-bill-w').hidden=!(v==='expense'&&S.bills.length)};
       $('#f-save').onclick=()=>{
         const amt=num($('#f-amt').value);if(!(amt>0))return errIn('f-err')('請輸入大過 0 嘅金額');
+        {const c=$('#f-cur').value;if(c==='HKD'){delete t.cur;delete t.fxAmt;delete t.fxRate}else{t.cur=c;t.fxAmt=r2(num($('#f-fxamt').value)||amt/fxRate(c));t.fxRate=num($('#f-fxrate').value)||fxRate(c)}}
         const d=readDate('f-date');const noDay=d.length===7;
         if($('#f-ch').value!==t.channel)t.chEdited=true;if($('#f-cat').value!==t.category)t.catManual=true;if($('#f-mer').value.trim()!==(t.merchant||''))t.merEdited=true;
         Object.assign(t,{ts:noDay?`${d}-01T00:00`:`${d}T${$('#f-time').value||'12:00'}`,noDay,amount:r2(amt),merchant:$('#f-mer').value.trim(),category:$('#f-cat').value,channel:$('#f-ch').value,type:$('#f-type').value,status:$('#f-st').value,note:$('#f-note').value.trim(),catChecked:true});
@@ -2218,6 +2244,7 @@ document.addEventListener('click',e=>{
   else if(a==='edit-income')openIncome(b.dataset.id,b.dataset.src);
   else if(a==='add-bill')openExpense('rec');
   else if(a==='edit-bill')openBill(b.dataset.id);
+  else if(a==='fx-reset'){S.settings.fx={};save();render();toast('已還原預設匯率')}
   else if(a==='ckw-edit')openKwEdit(b.dataset.k);
   else if(a==='recat')openRecat();
   else if(a==='fx-del'||a==='fx-restore'){const L=b.dataset.k==='bill'?S.bills:S.incomeTemplates;const x=L.find(y=>y.id===b.dataset.id);if(!x)return;if(a==='fx-del')x.deleted=true;else delete x.deleted;save();render();toast(a==='fx-del'?'已移去「已刪除」，喺首頁最底可以復原':'已復原')}
