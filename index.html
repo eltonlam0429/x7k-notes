@@ -267,7 +267,7 @@ main{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.29-64';
+const APP_VERSION='2026.10.30-65';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -949,28 +949,51 @@ function parseBankMail(text){
 // iOS 27「收到通知」自動化：銀包（Apple Pay／八達通）等通知通常冇「已付款」字眼，只有商戶同金額
 // 八達通餘額通知：「你的新餘額為HK$149.50」→ 同上次餘額比較計出支出／增值
 function octoDefaults(c){c.aavs=Object.assign({on:true,amt:500,cat:'交通'},c.aavs||{});return c.aavs}
+// 八達通餘額：每則「新餘額」通知都記入餘額記錄（按時間排序），支出／增值一律由「上一則餘額 → 呢則餘額」計，
+// 就算一次過載入多則、次序亂咗、或者中間更新咗 app，都會按時間重新對返
+function octoBalOf(text){const t=String(text);
+  if(!/(八達通|octopus)/i.test(t)||!/(新餘額|餘額為|結餘為|餘額|new balance|balance)/i.test(t))return null;
+  if(/(扣除|支付|付款|消費|spent|paid|增值|top.?up)/i.test(t)&&!/新餘額|new balance/i.test(t))return null;
+  const m=t.match(/(?:餘額|結餘|balance)[^\d-]{0,12}(-)?\s*(?:HK\$|HKD|\$)?\s*(-)?([\d,]+(?:\.\d{1,2})?)/i);if(!m)return null;
+  return(m[1]||m[2]?-1:1)*num(m[3])}
+function octoCard(){return S.cards.find(x=>x.type==='octopus')}
+function syncOcto(res){
+  const oc=octoCard();if(!oc)return 0;const A=octoDefaults(oc);
+  const L=(S.octoLog||[]).slice().sort((a,b)=>a.ts<b.ts?-1:a.ts>b.ts?1:0);if(L.length)oc.octoBal={bal:L[L.length-1].bal,ts:L[L.length-1].ts};
+  const want=new Map();
+  for(let i=1;i<L.length;i++){const a=L[i-1],b=L[i];if(b.manual)continue;const diff=r2(a.bal-b.bal);if(Math.abs(diff)<0.005)continue;
+    const inc=-diff,auto=diff<0&&A.on&&+A.amt>0&&Math.abs(inc-+A.amt)<0.005;
+    want.set('o'+b.k,diff>0?{type:'expense',amount:diff,ts:b.ts,line:b.line,merchant:'八達通消費',note:`由餘額計算：$${a.bal} → $${b.bal}`}
+      :{type:'transfer',amount:inc,ts:b.ts,line:b.line,merchant:auto?'八達通自動增值':'八達通增值',note:`由餘額計算：$${a.bal} → $${b.bal}（增加 $${r2(inc)}）${auto?'':'；可能係手動增值或交通津貼'}`})}
+  let n=0;
+  // 舊記錄：唔再啱嘅移去垃圾筒
+  S.txns=S.txns.filter(t=>{if(t.octKey&&!want.has(t.octKey)){trashPut('txn',t,{reason:'八達通餘額重新計算'});n++;return false}return true});
+  for(const[k,w]of want){
+    let t=S.txns.find(x=>x.octKey===k);
+    if(!t&&w.type==='expense'){// 已經有同金額、有商戶嘅八達通通知：唔重複記，只係掛返關係
+      t=S.txns.find(x=>!x.octKey&&x.channel===oc.id&&x.type==='expense'&&Math.abs(x.amount-w.amount)<0.005&&Math.abs(toDate(x.ts)-toDate(w.ts))<=36e5);if(t){t.octKey=k;t.raw=[...new Set([...(t.raw||[]),w.line])];continue}}
+    if(t){if(!t.amtEdited&&(Math.abs(t.amount-w.amount)>0.004||t.type!==w.type)){t.amount=r2(w.amount);t.type=w.type;t.note=w.note;if(/^八達通/.test(t.merchant||''))t.merchant=w.merchant;n++}continue}
+    S.txns.push({id:uid(),ts:w.ts,amount:r2(w.amount),merchant:w.merchant,category:w.type==='expense'?(A.cat||categorize(w.merchant)):'其他',channel:oc.id,type:w.type,status:'confirmed',source:'notif',sources:['notif'],raw:[w.line],note:w.note,catChecked:true,octKey:k});n++;if(res)res.added++}
+  return n}
 function handleOctoBalance(text,ts,line,res){
-  const t=String(text);
-  if(!/(八達通|octopus)/i.test(t)||!/(新餘額|餘額為|結餘為|餘額|new balance|balance)/i.test(t))return false;
-  if(/(扣除|支付|付款|消費|spent|paid|增值|top.?up)/i.test(t)&&!/新餘額|new balance/i.test(t))return false;
-  const m=t.match(/(?:餘額|結餘|balance)[^\d-]{0,12}(-)?\s*(?:HK\$|HKD|\$)?\s*(-)?([\d,]+(?:\.\d{1,2})?)/i);if(!m)return false;
-  const bal=(m[1]||m[2]?-1:1)*num(m[3]);
-  const oc=S.cards.find(x=>x.type==='octopus')||ensureCard('八達通','octopus');
+  const bal=octoBalOf(text);if(bal==null)return false;
+  const oc=octoCard()||ensureCard('八達通','octopus');
   if(oc.collect===false||!S.channels.octopus)return true;
-  const A=octoDefaults(oc);const prev=oc.octoBal;oc.octoBal={bal,ts};
-  if(!prev||prev.ts>ts){res.octo=(res.octo||0)+1;return true}
-  const mk=(type,amount,merchant,note,cat)=>{if(!(amount>0.004))return;
-    // 如果已經有同金額嘅八達通記錄（例如有商戶嘅通知），就唔再重複記
-    if(type==='expense'&&S.txns.some(x=>x.channel===oc.id&&x.type==='expense'&&Math.abs(x.amount-amount)<0.005&&Math.abs(toDate(x.ts)-toDate(ts))<=36e5))return;
-    S.txns.push({id:uid(),ts,amount:r2(amount),merchant,category:cat||categorize(merchant),channel:oc.id,type,status:'confirmed',source:'notif',sources:['notif'],raw:[line],note,catChecked:true});res.added++};
-  const diff=r2(prev.bal-bal);
-  if(diff>0)mk('expense',diff,'八達通消費',`由餘額計算：$${prev.bal} → $${bal}`,A.cat);
-  // 餘額增加 ＝ 增值（自動增值、手動增值、交通津貼等），照實際增加金額記低，唔計支出／收入
-  else if(diff<0){const inc=-diff;const auto=A.on&&+A.amt>0&&Math.abs(inc-+A.amt)<0.005;
-    mk('transfer',inc,auto?'八達通自動增值':'八達通增值',`由餘額計算：$${prev.bal} → $${bal}（增加 $${r2(inc)}）${auto?'':'；可能係手動增值或交通津貼'}`);
-  }
-  return true;
+  S.octoLog=S.octoLog||[];const k=hash(line);
+  if(!S.octoLog.some(x=>x.k===k))S.octoLog.push({k,ts,bal,line});
+  syncOcto(res);res.octo=(res.octo||0)+1;return true;
 }
+// 第一次：由舊嘅「由餘額計算」記錄重建餘額記錄，再用新方法計一次（會修正以前計錯嘅）
+function migrateOcto(){
+  if(S.octoLogV)return 0;S.octoLogV=1;const oc=octoCard();if(!oc){return 0}
+  S.octoLog=S.octoLog||[];const old=S.txns.filter(t=>t.channel===oc.id&&/^由餘額計算/.test(t.note||'')).sort((a,b)=>a.ts<b.ts?-1:1);
+  old.forEach((t,i)=>{const line=(t.raw||[]).find(r=>octoBalOf(String(r).split('||').slice(2).join(' ')||r)!=null);if(!line)return;
+    const bal=octoBalOf(String(line).split('||').slice(2).join(' ')||line);const k=hash(line);t.octKey='o'+k;
+    if(!S.octoLog.some(x=>x.k===k))S.octoLog.push({k,ts:t.ts,bal,line});
+    if(i===0){const m=String(t.note).match(/\$(-?[\d.]+)\s*→/);if(m)S.octoLog.push({k:'first'+t.id,ts:addMins(t.ts,-1),bal:+m[1],line:'',manual:true})}});
+  return syncOcto();
+}
+const addMins=(ts,m)=>fmtLocal(new Date(toDate(ts).getTime()+m*6e4));
 function parseWalletNotif(text){
   const t=String(text).replace(/\s+/g,' ');
   if(/(OTP|驗證碼|一次性|密碼|passcode)/i.test(t))return null;
@@ -1371,7 +1394,7 @@ async function syncPull(manual){
       showBusy('讀取試算表中…')}
     const res=await api(null,{action:'pull',since:S.inboxSince||0,ver:SYNC.ver});
     if(res.sheetUrl)SYNC.sheetUrl=res.sheetUrl;
-    if(res.state&&res.ver>SYNC.ver&&!SYNC.dirty){S=hydrate(JSON.parse(res.state));SYNC.ver=res.ver;localSave();collectSenders();if(cleanBlockedMail()+pendMailIncome()+moveAutoIncome()+fixL4All())save()}
+    if(res.state&&res.ver>SYNC.ver&&!SYNC.dirty){S=hydrate(JSON.parse(res.state));SYNC.ver=res.ver;localSave();collectSenders();if(cleanBlockedMail()+pendMailIncome()+moveAutoIncome()+fixL4All()+migrateOcto())save()}
     if(res.rows&&res.rows.length){S.inboxSince=Math.max(S.inboxSince||0,res.last);r=importText(res.rows.map(x=>x[1]).join('\n'))}
     else if(res.last<(S.inboxSince||0)){S.inboxSince=res.last;save()}
     net.state='ok';SYNC.lastOk=fmtSec(new Date());storeSync();
@@ -1922,7 +1945,7 @@ function openEditTx(id){
         const amt=num($('#f-amt').value);if(!(amt>0))return errIn('f-err')('請輸入大過 0 嘅金額');
         {const c=$('#f-cur').value;if(c==='HKD'){delete t.cur;delete t.fxAmt;delete t.fxRate}else{t.cur=c;t.fxAmt=r2(num($('#f-fxamt').value)||amt/fxRate(c));t.fxRate=num($('#f-fxrate').value)||fxRate(c)}}
         const d=readDate('f-date');const noDay=d.length===7;
-        if($('#f-ch').value!==t.channel)t.chEdited=true;if($('#f-cat').value!==t.category)t.catManual=true;if($('#f-mer').value.trim()!==(t.merchant||''))t.merEdited=true;
+        if($('#f-ch').value!==t.channel)t.chEdited=true;if($('#f-cat').value!==t.category)t.catManual=true;if(Math.abs(num($('#f-amt').value)-t.amount)>0.004)t.amtEdited=true;if($('#f-mer').value.trim()!==(t.merchant||''))t.merEdited=true;
         Object.assign(t,{ts:noDay?`${d}-01T00:00`:`${d}T${$('#f-time').value||'12:00'}`,noDay,amount:r2(amt),merchant:$('#f-mer').value.trim(),category:$('#f-cat').value,channel:$('#f-ch').value,type:$('#f-type').value,status:$('#f-st').value,note:$('#f-note').value.trim(),catChecked:true});
         delete t.suggestTpl;delete t.suggestBill;
         if(t.type==='income'&&$('#f-tpl').value){const T=S.incomeTemplates.find(x=>x.id===$('#f-tpl').value);const M=payMonth(t.ts);t.linkTpl=T.id;t.linkMonth=M;
@@ -2162,7 +2185,7 @@ function openCard(id){
       <div class="err" id="c-err" hidden></div>
       <div class="actions"><button class="btn" type="button" id="c-save">儲存</button>${isNew?'':'<button class="btn danger" type="button" id="c-del">刪除卡</button>'}</div>`,()=>{
         const val=q=>{const e=document.querySelector(q);return e?e.value.trim():''};
-        const grab=()=>{if($('#rv-m'))R.from=`${$('#rv-y').value}-${pad($('#rv-m').value)}`;if($('#o-on')){const A=octoDefaults(d);A.on=$('#o-on').value==='1';A.amt=num($('#o-amt').value)||0;A.cat=$('#o-cat').value;const b=$('#o-bal').value.trim();if(b!==''&&!isNaN(num(b))&&(!d.octoBal||num(b)!==d.octoBal.bal))d.octoBal={bal:num(b),ts:fmtLocal(new Date())}}R.resetDay=+$('#c-reset').value||1;if($('#c-fund'))d.fundCard=$('#c-fund').value||null;d.desigs=d.desigs||[];d.desigs.forEach((x,i)=>{const n=document.querySelector(`[data-dn="${i}"]`);if(n){x.name=n.value.trim();x.desc=document.querySelector(`[data-dd="${i}"]`).value.trim()}});if($('#c-per')){R.capPeriod=$('#c-per').value;if($('#c-ys'))R.yearStart=+$('#c-ys').value||1}if($('#c-fee')){d.feeFree=$('#c-fee').value!=='pay';if($('#c-feem'))d.feeMonth=+$('#c-feem').value||null}if($('#c-stmt')){d.stmtDay=+$('#c-stmt').value||null;d.stmtRule=$('#c-srule').value;if($('#c-due')){d.dueDay=+$('#c-due').value||null;d.dueMonth=$('#c-duem').value}}d.name=$('#c-name').value;d.type=$('#c-type').value;d.collect=$('#c-col').checked;d.keywords=$('#c-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);if($('#c-pref'))d.l4Pref=$('#c-pref').checked;
+        const grab=()=>{if($('#rv-m'))R.from=`${$('#rv-y').value}-${pad($('#rv-m').value)}`;if($('#o-on')){const A=octoDefaults(d);A.on=$('#o-on').value==='1';A.amt=num($('#o-amt').value)||0;A.cat=$('#o-cat').value;const b=$('#o-bal').value.trim();if(b!==''&&!isNaN(num(b))&&(!d.octoBal||num(b)!==d.octoBal.bal)){d.octoBal={bal:num(b),ts:fmtLocal(new Date())};S.octoLog=S.octoLog||[];S.octoLog.push({k:'m'+uid(),ts:d.octoBal.ts,bal:num(b),line:'',manual:true})}}R.resetDay=+$('#c-reset').value||1;if($('#c-fund'))d.fundCard=$('#c-fund').value||null;d.desigs=d.desigs||[];d.desigs.forEach((x,i)=>{const n=document.querySelector(`[data-dn="${i}"]`);if(n){x.name=n.value.trim();x.desc=document.querySelector(`[data-dd="${i}"]`).value.trim()}});if($('#c-per')){R.capPeriod=$('#c-per').value;if($('#c-ys'))R.yearStart=+$('#c-ys').value||1}if($('#c-fee')){d.feeFree=$('#c-fee').value!=='pay';if($('#c-feem'))d.feeMonth=+$('#c-feem').value||null}if($('#c-stmt')){d.stmtDay=+$('#c-stmt').value||null;d.stmtRule=$('#c-srule').value;if($('#c-due')){d.dueDay=+$('#c-due').value||null;d.dueMonth=$('#c-duem').value}}d.name=$('#c-name').value;d.type=$('#c-type').value;d.collect=$('#c-col').checked;d.keywords=$('#c-kw').value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);if($('#c-pref'))d.l4Pref=$('#c-pref').checked;
           if(R.mode==='tier')R.tiers.forEach((t,i)=>{const l=val(`[data-tl="${i}"]`);t.limit=l===''?'':num(l);t.pct=num(val(`[data-tp="${i}"]`))||0});
           else if(R.mode==='split'){R.basePct=num(val('#c-base'))||0;R.extraPct=num(val('#c-extra'))||0;const c=val('#c-cap');R.extraCap=c===''?'':num(c)}
           else{R.basePct=num(val('#c-base'))||0;if($('#c-rcap')){const rc=val('#c-rcap');R.rebCap=rc===''?'':num(rc);if($('#c-rnet'))R.rebCapNet=$('#c-rnet').checked}R.catRules.forEach((r,i)=>{r.pct=num(val(`[data-rp="${i}"]`))||0;const c=val(`[data-rcap="${i}"]`);r.cap=c===''?'':num(c);const o=val(`[data-rop="${i}"]`);r.overPct=o===''?'':num(o);(r.extras||[]).forEach((x,j)=>{x.pct=num(val(`[data-xp="${i}-${j}"]`))||0;const xc=val(`[data-xc="${i}-${j}"]`);x.cap=xc===''?'':num(xc)})})}};
@@ -2328,7 +2351,7 @@ function render(){
   updateBadge();
   $('#btn-hide').textContent=S.settings.hideIncome?'顯示收入':'隱藏收入';
 }
-{collectSenders();const n=cleanBlockedMail(),q=pendMailIncome();moveAutoIncome();fixL4All();save();if(n||q)setTimeout(()=>toast([n?`已清走 ${n} 筆推廣電郵記錄（喺垃圾筒可以還原）`:'',q?`${q} 筆電郵收入改咗做待核實`:''].filter(Boolean).join(' · ')),400)}
+{collectSenders();const n=cleanBlockedMail(),q=pendMailIncome();moveAutoIncome();fixL4All();migrateOcto();save();if(n||q)setTimeout(()=>toast([n?`已清走 ${n} 筆推廣電郵記錄（喺垃圾筒可以還原）`:'',q?`${q} 筆電郵收入改咗做待核實`:''].filter(Boolean).join(' · ')),400)}
 refreshStatuses();render();
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 setInterval(()=>{if(document.hidden)return;refreshStatuses();if(CONN)syncPull(false);else softRender()},60000);
