@@ -230,7 +230,9 @@ h1{font-size:26px;font-weight:700;letter-spacing:0}
 .topbar{border-bottom:0;background:color-mix(in srgb,var(--bg) 88%,transparent)}
 .brand{color:var(--ink);letter-spacing:.04em}
 .stat .ic{border-radius:10px}
-.tabbar{border-top:1px solid var(--line);padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px))}
+.tabbar{position:fixed;left:0;right:0;bottom:0;top:auto;border-top:1px solid var(--line);padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px));background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none;transform:translateZ(0);will-change:transform}
+/* iPhone 主畫面 app：拉過頂／過底嘅彈性捲動會令底部分頁跟住郁，關咗佢 */
+html,body{overscroll-behavior:none;overscroll-behavior-y:none}
 .tabbar button{border-radius:16px;font-size:12px}
 .tabbar button[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
 main{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
@@ -267,7 +269,7 @@ main{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.31-66';
+const APP_VERSION='2026.10.31-67';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
