@@ -267,7 +267,7 @@ main{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
 
 <script>
 'use strict';
-const APP_VERSION='2026.10.30-65';
+const APP_VERSION='2026.10.31-66';
 /* ===================== 基本工具 ===================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -882,8 +882,17 @@ function addIncomeAuto(e,res){
   const n={id:uid(),ts:e.ts,amount:r2(e.amount),merchant:e.name,category:'其他',channel:'bank',type:'income',status:'confirmed',source:e.src,sources:[e.src],raw:[e.raw],note:/(支票|cheque|\bchq\b)/i.test(e.raw||'')?'單一收入；支票':'單一收入',catChecked:true};
   attachFx(n);S.txns.push(n);if(res)res.income++;return n;
 }
+// 還卡數：由戶口轉錢去信用卡（例如「從賬戶…轉出…給信用卡尾號 0114」）
+const CARD_REPAY_RE=/((轉出|轉賬|轉帳|轉款|付款|繳付|繳交|還款|支付|transfer(?:red)?|paid|payment)[^¦。]{0,60}?(給|至|到|予|入|to)\s*(?:你的|您的|閣下的|your)?\s*(信用卡|credit\s*card|card))|((信用卡|credit\s*card)[^¦。]{0,8}(還款|繳款|付款|payment))|還卡數/i;
+function isCardRepay(text){const t=String(text||'');return CARD_REPAY_RE.test(t)&&!/(簽賬|消費|purchase|在[^¦。]{1,30}交易)/i.test(t)}
+// 2026.10.31：舊嘅還卡數轉賬（由戶口轉去信用卡）改做「轉賬/還卡數」，渠道銀行轉帳
+function fixRepay(){if(S.settings.repayFixV)return 0;S.settings.repayFixV=1;let n=0;
+  S.txns.forEach(t=>{if(t.type!=='expense'||t.chEdited||t.catManual)return;const raw=(t.raw||[]).join(' ¦ ');if(!isCardRepay(raw))return;
+    const c=l4Card(raw),l4=l4Of(raw);t.type='transfer';t.channel='bank';t.chEdited=true;t.merchant=`還卡數 · ${c?c.name:l4?'信用卡尾號 '+l4:'信用卡'}`;t.note=((t.note?t.note+'；':'')+'信用卡還款');n++});return n}
 function ingest(t,rawLine,res){
   t.raw=[rawLine];
+  if(t.type!=='income'&&t.type!=='refund'&&isCardRepay(rawLine)){const c=l4Card(rawLine);const l4=l4Of(rawLine);
+    t.type='transfer';t.channel='bank';t.chEdited=true;t.merchant=`還卡數 · ${c?c.name:l4?'信用卡尾號 '+l4:'信用卡'}`;t.note=((t.note?t.note+'；':'')+'信用卡還款');t.repayCard=c?c.id:null}
   // 信用卡扣數而商戶係 PayMe／BoC Pay 等錢包：即係增值，唔當支出
   if(t.type==='expense'&&isCreditCh(t.channel)&&(/(payme|boc ?pay|增值|top.?up|reload|充值)/i.test(t.merchant||'')||/(增值|top.?up|充值)/i.test(rawLine))){t.type='transfer';const w=PAY_APP.find(p=>p[0].test(t.merchant||''));if(w)t.merchant=`${w[2]} 增值`;t.note=((t.note?t.note+'；':'')+`增值途徑：${chName(t.channel)}`)}
   // 支票：當銀行轉賬，備註「支票」
@@ -1394,7 +1403,7 @@ async function syncPull(manual){
       showBusy('讀取試算表中…')}
     const res=await api(null,{action:'pull',since:S.inboxSince||0,ver:SYNC.ver});
     if(res.sheetUrl)SYNC.sheetUrl=res.sheetUrl;
-    if(res.state&&res.ver>SYNC.ver&&!SYNC.dirty){S=hydrate(JSON.parse(res.state));SYNC.ver=res.ver;localSave();collectSenders();if(cleanBlockedMail()+pendMailIncome()+moveAutoIncome()+fixL4All()+migrateOcto())save()}
+    if(res.state&&res.ver>SYNC.ver&&!SYNC.dirty){S=hydrate(JSON.parse(res.state));SYNC.ver=res.ver;localSave();collectSenders();if(cleanBlockedMail()+pendMailIncome()+moveAutoIncome()+fixL4All()+migrateOcto()+fixRepay())save()}
     if(res.rows&&res.rows.length){S.inboxSince=Math.max(S.inboxSince||0,res.last);r=importText(res.rows.map(x=>x[1]).join('\n'))}
     else if(res.last<(S.inboxSince||0)){S.inboxSince=res.last;save()}
     net.state='ok';SYNC.lastOk=fmtSec(new Date());storeSync();
@@ -2351,7 +2360,7 @@ function render(){
   updateBadge();
   $('#btn-hide').textContent=S.settings.hideIncome?'顯示收入':'隱藏收入';
 }
-{collectSenders();const n=cleanBlockedMail(),q=pendMailIncome();moveAutoIncome();fixL4All();migrateOcto();save();if(n||q)setTimeout(()=>toast([n?`已清走 ${n} 筆推廣電郵記錄（喺垃圾筒可以還原）`:'',q?`${q} 筆電郵收入改咗做待核實`:''].filter(Boolean).join(' · ')),400)}
+{collectSenders();const n=cleanBlockedMail(),q=pendMailIncome();moveAutoIncome();fixL4All();migrateOcto();fixRepay();save();if(n||q)setTimeout(()=>toast([n?`已清走 ${n} 筆推廣電郵記錄（喺垃圾筒可以還原）`:'',q?`${q} 筆電郵收入改咗做待核實`:''].filter(Boolean).join(' · ')),400)}
 refreshStatuses();render();
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 setInterval(()=>{if(document.hidden)return;refreshStatuses();if(CONN)syncPull(false);else softRender()},60000);
